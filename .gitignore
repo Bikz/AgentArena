@@ -1,0 +1,43 @@
+# --- General ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.vscode/
+.idea/
+
+# Local agent/skill configs
+.agents/
+
+# Local codex config / caches
+.codex/
+
+# Local factory artifacts
+.factory/
+
+# Dependency dirs (common)
+node_modules/
+vendor/
+
+# Build output (common)
+dist/
+build/
+out/
+.next/
+.turbo/
+.expo/
+
+# --- Project conventions ---
+# Docs are treated as internal working notes for this hackathon repo.
+docs/
