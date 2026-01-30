@@ -1,0 +1,32 @@
+{
+  "name": "@agent-arena/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "format": "prettier -w .",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@fastify/helmet": "^13.0.0",
+    "@fastify/websocket": "^11.2.0",
+    "fastify": "^5.3.0",
+    "fastify-type-provider-zod": "^4.0.2",
+    "ws": "^8.18.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.20.0",
+    "prettier": "^3.5.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.8.2",
+    "vitest": "^3.2.4"
+  }
+}
