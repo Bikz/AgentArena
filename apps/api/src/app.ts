@@ -59,6 +59,7 @@ export function buildApp() {
     name: z.string().min(1).max(64),
     prompt: z.string().min(1).max(10_000),
     model: z.string().min(1).max(128),
+    strategy: z.enum(["hold", "random", "trend", "mean_revert"]),
   });
 
   app.post(

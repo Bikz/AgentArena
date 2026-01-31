@@ -7,6 +7,7 @@ export type AgentRow = {
   name: string;
   prompt: string;
   model: string;
+  strategy: string;
 };
 
 export function newId(prefix: string) {
@@ -15,19 +16,19 @@ export function newId(prefix: string) {
 
 export async function listAgents(pool: Pool) {
   const res = await pool.query<AgentRow>(
-    "select id, created_at, name, prompt, model from agents order by created_at desc limit 100",
+    "select id, created_at, name, prompt, model, strategy from agents order by created_at desc limit 100",
   );
   return res.rows;
 }
 
 export async function createAgent(
   pool: Pool,
-  input: { name: string; prompt: string; model: string },
+  input: { name: string; prompt: string; model: string; strategy: string },
 ) {
   const id = newId("agent");
   await pool.query(
-    "insert into agents (id, name, prompt, model) values ($1, $2, $3, $4)",
-    [id, input.name, input.prompt, input.model],
+    "insert into agents (id, name, prompt, model, strategy) values ($1, $2, $3, $4, $5)",
+    [id, input.name, input.prompt, input.model, input.strategy],
   );
   return id;
 }
