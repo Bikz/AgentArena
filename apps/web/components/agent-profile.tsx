@@ -8,6 +8,7 @@ type Agent = {
   prompt: string;
   model: string;
   strategy: "hold" | "random" | "trend" | "mean_revert";
+  owner_address?: string | null;
 };
 
 async function fetchAgent(agentId: string): Promise<Agent | null> {
@@ -59,6 +60,12 @@ export async function AgentProfile({ agentId }: { agentId: string }) {
             <div className="mt-1 text-sm">{new Date(agent.created_at).toLocaleString()}</div>
           </div>
           <div className="md:col-span-2">
+            <div className="text-sm text-muted-foreground">Owner</div>
+            <div className="mt-1 break-all text-sm text-muted-foreground">
+              {agent.owner_address ?? "—"}
+            </div>
+          </div>
+          <div className="md:col-span-2">
             <div className="text-sm text-muted-foreground">Prompt</div>
             <pre className="mt-2 whitespace-pre-wrap rounded-xl border border-border bg-background p-3 text-sm text-foreground">
               {agent.prompt}
@@ -69,4 +76,3 @@ export async function AgentProfile({ agentId }: { agentId: string }) {
     </main>
   );
 }
-

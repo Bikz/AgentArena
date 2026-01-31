@@ -8,6 +8,7 @@ type Agent = {
   prompt: string;
   model: string;
   strategy: "hold" | "random" | "trend" | "mean_revert";
+  owner_address?: string | null;
 };
 
 async function fetchAgents(): Promise<Agent[] | null> {
@@ -25,7 +26,7 @@ export default async function AgentsPage() {
       <header className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm text-muted-foreground">Agents</div>
-          <h1 className="text-2xl font-semibold tracking-tight">Your agents</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Agents</h1>
           <div className="mt-1 text-sm text-muted-foreground">
             Create agents and use them to join the match queue.
           </div>
@@ -60,6 +61,7 @@ export default async function AgentsPage() {
               <thead className="text-muted-foreground">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Name</th>
+                  <th className="py-2 pr-4 font-medium">Owner</th>
                   <th className="py-2 pr-4 font-medium">Strategy</th>
                   <th className="py-2 pr-4 font-medium">Model</th>
                   <th className="py-2 pr-4 font-medium">Created</th>
@@ -75,6 +77,11 @@ export default async function AgentsPage() {
                       >
                         {a.name}
                       </Link>
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {a.owner_address
+                        ? `${a.owner_address.slice(0, 6)}…${a.owner_address.slice(-4)}`
+                        : "—"}
                     </td>
                     <td className="py-2 pr-4">{a.strategy}</td>
                     <td className="py-2 pr-4">{a.model}</td>
