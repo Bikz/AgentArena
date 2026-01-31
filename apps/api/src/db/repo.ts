@@ -33,6 +33,14 @@ export async function createAgent(
   return id;
 }
 
+export async function getAgent(pool: Pool, agentId: string) {
+  const res = await pool.query<AgentRow>(
+    "select id, created_at, name, prompt, model, strategy from agents where id=$1",
+    [agentId],
+  );
+  return res.rows[0] ?? null;
+}
+
 export async function getMatch(pool: Pool, matchId: string) {
   const matchRes = await pool.query(
     "select id, created_at, phase, tick_interval_ms, max_ticks, start_price from matches where id=$1",

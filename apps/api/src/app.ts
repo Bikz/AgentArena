@@ -13,6 +13,7 @@ import { MatchEngine } from "./match/engine.js";
 import { createPool } from "./db/conn.js";
 import {
   createAgent,
+  getAgent,
   getMatch,
   insertTick,
   listAgents,
@@ -212,7 +213,7 @@ export function buildApp() {
           }
         }
 
-        socket.on("message", (_data: WsRawData) => {
+        socket.on("message", async (_data: WsRawData) => {
           try {
             const json = JSON.parse(_data.toString());
             const parsed = ClientEventSchema.safeParse(json);
@@ -234,6 +235,26 @@ export function buildApp() {
             }
 
             if (parsed.data.type === "join_queue") {
+              if (pool && parsed.data.agentId) {
+                const agent = await getAgent(pool, parsed.data.agentId);
+                if (!agent) {
+                  socket.send(
+                    JSON.stringify({
+                      type: "error",
+                      v: 1,
+                      code: "AGENT_NOT_FOUND",
+                      message: "Agent ID not found.",
+                    }),
+                  );
+                  return;
+                }
+                engine.joinQueue({
+                  agentId: agent.id,
+                  agentName: agent.name,
+                  strategy: agent.strategy as any,
+                });
+                return;
+              }
               engine.joinQueue({
                 agentId: parsed.data.agentId,
                 agentName: parsed.data.agentName,
