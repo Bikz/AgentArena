@@ -11,7 +11,14 @@ import {
 import { z } from "zod";
 import { MatchEngine } from "./match/engine.js";
 import { createPool } from "./db/conn.js";
-import { createAgent, getMatch, listAgents } from "./db/repo.js";
+import {
+  createAgent,
+  getMatch,
+  insertTick,
+  listAgents,
+  upsertMatch,
+  upsertSeat,
+} from "./db/repo.js";
 
 type WsRawData = string | Buffer | ArrayBuffer | Buffer[];
 type WsClient = {
@@ -99,6 +106,59 @@ export function buildApp() {
   const engine = new MatchEngine(
     (matchId, event) => broadcastToMatch(matchId, event),
     (event) => broadcastToAll(event),
+    pool
+      ? {
+          onError: (err) => app.log.error({ err }, "engine persistence error"),
+          onMatchCreated: async (m) => {
+            await upsertMatch(pool, {
+              id: m.config.matchId,
+              phase: m.phase,
+              tickIntervalMs: m.config.tickIntervalMs,
+              maxTicks: m.config.maxTicks,
+              startPrice: m.config.startPrice,
+            });
+            for (const seat of m.seats) {
+              await upsertSeat(pool, {
+                matchId: m.config.matchId,
+                seatId: seat.seatId,
+                agentId: null,
+                agentName: seat.agentName,
+                strategy: seat.strategy,
+              });
+            }
+          },
+          onTick: async (m) => {
+            await upsertMatch(pool, {
+              id: m.config.matchId,
+              phase: m.phase,
+              tickIntervalMs: m.config.tickIntervalMs,
+              maxTicks: m.config.maxTicks,
+              startPrice: m.config.startPrice,
+            });
+            await insertTick(pool, {
+              matchId: m.config.matchId,
+              tick: m.tick,
+              ts: new Date(),
+              btcPrice: m.price,
+              leaderboard: m.seats.map((s) => ({
+                seatId: s.seatId,
+                agentName: s.agentName,
+                credits: s.credits,
+                target: s.target,
+              })),
+            });
+          },
+          onFinished: async (m) => {
+            await upsertMatch(pool, {
+              id: m.config.matchId,
+              phase: m.phase,
+              tickIntervalMs: m.config.tickIntervalMs,
+              maxTicks: m.config.maxTicks,
+              startPrice: m.config.startPrice,
+            });
+          },
+        }
+      : undefined,
   );
 
   const WsQuery = z.object({

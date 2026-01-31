@@ -33,6 +33,12 @@ export type MatchState = {
 
 type Broadcast = (matchId: string, event: ServerEvent) => void;
 type BroadcastAll = (event: ServerEvent) => void;
+type EngineHooks = {
+  onMatchCreated?: (match: MatchState) => void | Promise<void>;
+  onTick?: (match: MatchState) => void | Promise<void>;
+  onFinished?: (match: MatchState) => void | Promise<void>;
+  onError?: (err: unknown) => void;
+};
 
 function mulberry32(seed: number) {
   return () => {
@@ -70,6 +76,7 @@ export class MatchEngine {
   constructor(
     private readonly broadcast: Broadcast,
     private readonly broadcastAll: BroadcastAll,
+    private readonly hooks?: EngineHooks,
   ) {}
 
   getQueueSize() {
@@ -132,6 +139,9 @@ export class MatchEngine {
       createdAt: Date.now(),
     };
     this.matchById.set(config.matchId, state);
+    void Promise.resolve(this.hooks?.onMatchCreated?.(state)).catch((err) =>
+      this.hooks?.onError?.(err),
+    );
 
     this.broadcastAll({
       type: "match_status",
@@ -197,12 +207,20 @@ export class MatchEngine {
         })),
       });
 
+      void Promise.resolve(this.hooks?.onTick?.(current)).catch((err) =>
+        this.hooks?.onError?.(err),
+      );
+
       if (current.tick >= current.config.maxTicks) {
         current.phase = "finished";
         current.finishedAt = Date.now();
         const active = this.runningTimerByMatchId.get(matchId);
         if (active) clearInterval(active);
         this.runningTimerByMatchId.delete(matchId);
+
+        void Promise.resolve(this.hooks?.onFinished?.(current)).catch((err) =>
+          this.hooks?.onError?.(err),
+        );
 
         this.broadcastAll({
           type: "match_status",
@@ -255,4 +273,3 @@ export class MatchEngine {
     this.queue = [];
   }
 }
-

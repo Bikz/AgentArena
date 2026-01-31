@@ -56,3 +56,59 @@ export async function getMatch(pool: Pool, matchId: string) {
   };
 }
 
+export async function upsertMatch(
+  pool: Pool,
+  input: {
+    id: string;
+    phase: string;
+    tickIntervalMs: number;
+    maxTicks: number;
+    startPrice: number;
+  },
+) {
+  await pool.query(
+    `insert into matches (id, phase, tick_interval_ms, max_ticks, start_price)
+     values ($1, $2, $3, $4, $5)
+     on conflict (id) do update set phase = excluded.phase`,
+    [input.id, input.phase, input.tickIntervalMs, input.maxTicks, input.startPrice],
+  );
+}
+
+export async function upsertSeat(
+  pool: Pool,
+  input: {
+    matchId: string;
+    seatId: string;
+    agentId: string | null;
+    agentName: string;
+    strategy: string;
+  },
+) {
+  await pool.query(
+    `insert into match_seats (match_id, seat_id, agent_id, agent_name, strategy)
+     values ($1, $2, $3, $4, $5)
+     on conflict (match_id, seat_id) do update
+       set agent_id = excluded.agent_id,
+           agent_name = excluded.agent_name,
+           strategy = excluded.strategy`,
+    [input.matchId, input.seatId, input.agentId, input.agentName, input.strategy],
+  );
+}
+
+export async function insertTick(
+  pool: Pool,
+  input: {
+    matchId: string;
+    tick: number;
+    ts: Date;
+    btcPrice: number;
+    leaderboard: unknown;
+  },
+) {
+  await pool.query(
+    `insert into match_ticks (match_id, tick, ts, btc_price, leaderboard)
+     values ($1, $2, $3, $4, $5)
+     on conflict (match_id, tick) do nothing`,
+    [input.matchId, input.tick, input.ts, input.btcPrice, input.leaderboard],
+  );
+}
