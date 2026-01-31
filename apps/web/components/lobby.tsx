@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useWsEvents } from "@/hooks/useWsEvents";
 import { ConnectWalletButton } from "@/components/connect-wallet-button";
+import { useAuth } from "@/hooks/useAuth";
 
 type Strategy = "hold" | "random" | "trend" | "mean_revert";
 type Agent = {
@@ -22,6 +23,7 @@ export function Lobby() {
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
 
   const { state, events, send } = useWsEvents();
+  const auth = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -87,7 +89,39 @@ export function Lobby() {
             Status: {state} · Queue: {queue ? queue.queueSize : "—"}
           </div>
         </div>
-        <ConnectWalletButton />
+        <div className="flex flex-col items-start gap-2 md:items-end">
+          <ConnectWalletButton />
+          <div className="flex items-center gap-3">
+            {auth.isSignedIn ? (
+              <>
+                <div className="text-sm text-muted-foreground">
+                  Signed in
+                </div>
+                <button
+                  type="button"
+                  onClick={() => auth.signOut()}
+                  className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={auth.state === "signing" || auth.state === "loading"}
+                onClick={() => auth.signIn()}
+                className="text-sm text-muted-foreground underline-offset-4 hover:underline disabled:opacity-50"
+              >
+                {auth.state === "signing" ? "Signing…" : "Sign in"}
+              </button>
+            )}
+          </div>
+          {auth.error ? (
+            <div className="text-sm text-destructive-foreground/80">
+              {auth.error}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <form

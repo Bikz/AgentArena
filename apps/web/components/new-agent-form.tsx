@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 type Strategy = "hold" | "random" | "trend" | "mean_revert";
 
 export function NewAgentForm() {
   const router = useRouter();
+  const auth = useAuth();
   const [name, setName] = useState("MyAgent");
   const [model, setModel] = useState("gpt-4o-mini");
   const [strategy, setStrategy] = useState<Strategy>("trend");
@@ -22,9 +24,10 @@ export function NewAgentForm() {
       state !== "saving" &&
       name.trim().length > 0 &&
       model.trim().length > 0 &&
-      prompt.trim().length > 0
+      prompt.trim().length > 0 &&
+      auth.isSignedIn
     );
-  }, [model, name, prompt, state]);
+  }, [auth.isSignedIn, model, name, prompt, state]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-10">
@@ -55,6 +58,7 @@ export function NewAgentForm() {
             const res = await fetch(`${base}/agents`, {
               method: "POST",
               headers: { "content-type": "application/json" },
+              credentials: "include",
               body: JSON.stringify({
                 name: name.trim(),
                 prompt: prompt.trim(),
@@ -64,6 +68,7 @@ export function NewAgentForm() {
             });
 
             if (!res.ok) {
+              if (res.status === 401) throw new Error("Sign in to create agents.");
               const text = await res.text();
               throw new Error(text || "Failed to create agent.");
             }
@@ -146,11 +151,10 @@ export function NewAgentForm() {
             {state === "saving" ? "Creating…" : "Create agent"}
           </button>
           <div className="text-sm text-muted-foreground">
-            Requires API + DB.
+            {auth.isSignedIn ? "Requires API + DB." : "Sign in required."}
           </div>
         </div>
       </form>
     </main>
   );
 }
-
