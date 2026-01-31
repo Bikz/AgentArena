@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { concatHex, keccak256, stringToHex } from "viem";
 import { agentArenaSubnameRegistrarAbi, getParentNamehash, getRegistrarAddress } from "@/lib/ens-registrar";
@@ -36,6 +37,7 @@ export function ClaimEnsCard(props: {
     ens_tx_hash?: string | null;
   };
 }) {
+  const router = useRouter();
   const { address, isConnected, chainId } = useAccount();
   const auth = useAuth();
   const registrar = getRegistrarAddress();
@@ -44,6 +46,11 @@ export function ClaimEnsCard(props: {
   const [label, setLabel] = useState(() => sanitizeLabel(props.agent.name));
   const [state, setState] = useState<"idle" | "building" | "saving" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<{
+    txHash: `0x${string}`;
+    ensName: string;
+    node: `0x${string}`;
+  } | null>(null);
 
   const canClaim = useMemo(() => {
     return (
@@ -68,11 +75,50 @@ export function ClaimEnsCard(props: {
 
   const { data: txHash, writeContractAsync, isPending: isWriting } = useWriteContract();
   const receipt = useWaitForTransactionReceipt({
-    hash: txHash,
-    query: { enabled: Boolean(txHash) },
+    hash: pending?.txHash ?? txHash,
+    query: { enabled: Boolean(pending?.txHash ?? txHash) },
   });
 
   const parentDisplay = process.env.NEXT_PUBLIC_ENS_PARENT_NAME ?? "agentarena.eth";
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!pending) return;
+      if (!receipt.isSuccess) return;
+      setState("saving");
+      setError(null);
+      try {
+        const base = process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
+        const res = await fetch(`${base}/agents/${props.agent.id}/ens`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ensName: pending.ensName,
+            ensNode: pending.node,
+            txHash: pending.txHash,
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || "Failed to persist ENS claim.");
+        }
+        if (cancelled) return;
+        setPending(null);
+        setState("idle");
+        router.refresh();
+      } catch (err) {
+        if (cancelled) return;
+        setState("error");
+        setError(err instanceof Error ? err.message : "Unknown error");
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [pending, props.agent.id, receipt.isSuccess, router]);
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
@@ -151,6 +197,11 @@ export function ClaimEnsCard(props: {
                 "v0",
               ];
 
+              // Compute expected ENS node for persistence.
+              const labelhash = keccak256(stringToHex(label));
+              const node = keccak256(concatHex([parentNamehash, labelhash]));
+              const ensName = `${label}.${parentDisplay}`;
+
               const tx = await writeContractAsync({
                 address: registrar,
                 abi: agentArenaSubnameRegistrarAbi,
@@ -158,35 +209,13 @@ export function ClaimEnsCard(props: {
                 args: [label, address, keys, values],
               });
 
-              // Compute expected ENS node for persistence.
-              const labelhash = keccak256(stringToHex(label));
-              const node = keccak256(concatHex([parentNamehash, labelhash]));
-              const ensName = `${label}.${parentDisplay}`;
-
-              setState("saving");
-              const base = process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
-              const res = await fetch(`${base}/agents/${props.agent.id}/ens`, {
-                method: "POST",
-                credentials: "include",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                  ensName,
-                  ensNode: node,
-                  txHash: tx,
-                }),
-              });
-              if (!res.ok) {
-                const text = await res.text();
-                throw new Error(text || "Failed to persist ENS claim.");
-              }
-
-              // Hard refresh to show claimed fields.
-              window.location.reload();
+              setPending({ txHash: tx, ensName, node });
             } catch (err) {
               setState("error");
               setError(err instanceof Error ? err.message : "Unknown error");
             } finally {
-              setState("idle");
+              // state may be set to saving by effect if receipt succeeds
+              setState((s) => (s === "saving" ? s : "idle"));
             }
           }}
           className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
@@ -199,7 +228,9 @@ export function ClaimEnsCard(props: {
                 ? "Preparing…"
                 : isWriting
                   ? "Claiming…"
-                  : "Claim subname"}
+                  : pending
+                    ? "Confirming…"
+                    : "Claim subname"}
         </button>
         <div className="text-sm text-muted-foreground">
           {receipt.isLoading
@@ -219,4 +250,3 @@ export function ClaimEnsCard(props: {
     </section>
   );
 }
-
