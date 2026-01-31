@@ -17,6 +17,7 @@
     "@fastify/helmet": "^13.0.0",
     "@fastify/websocket": "^11.2.0",
     "@agent-arena/shared": "workspace:*",
+    "dotenv": "^16.6.1",
     "fastify": "^5.3.0",
     "fastify-type-provider-zod": "^4.0.2",
     "pg": "^8.16.3",

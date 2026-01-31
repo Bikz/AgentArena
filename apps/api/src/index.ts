@@ -1,3 +1,4 @@
+import "./env.js";
 import { buildApp } from "./app.js";
 
 const port = Number(process.env.PORT ?? 3001);
@@ -16,4 +17,3 @@ process.on("SIGTERM", () => void close("SIGTERM"));
 
 await app.listen({ host, port });
 app.log.info({ host, port }, "api listening");
-

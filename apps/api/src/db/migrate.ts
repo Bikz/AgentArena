@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import "../env.js";
 import { createPool } from "./conn.js";
 
 const __filename = fileURLToPath(import.meta.url);
