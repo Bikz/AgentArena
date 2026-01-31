@@ -10,6 +10,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@agent-arena/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@fastify/cors':
         specifier: ^11.1.0
         version: 11.2.0

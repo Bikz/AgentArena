@@ -15,6 +15,7 @@
     "@fastify/cors": "^11.1.0",
     "@fastify/helmet": "^13.0.0",
     "@fastify/websocket": "^11.2.0",
+    "@agent-arena/shared": "workspace:*",
     "fastify": "^5.3.0",
     "fastify-type-provider-zod": "^4.0.2",
     "ws": "^8.18.3",
