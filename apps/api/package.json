@@ -13,10 +13,11 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@agent-arena/shared": "workspace:*",
     "@fastify/cors": "^11.1.0",
     "@fastify/helmet": "^13.0.0",
     "@fastify/websocket": "^11.2.0",
-    "@agent-arena/shared": "workspace:*",
+    "ai": "^6.0.64",
     "dotenv": "^16.6.1",
     "fastify": "^5.3.0",
     "fastify-type-provider-zod": "^4.0.2",
@@ -25,10 +26,10 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.41.0",
-    "@typescript-eslint/parser": "^8.41.0",
     "@types/node": "^24.3.0",
     "@types/pg": "^8.15.5",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.20.0",
     "prettier": "^3.5.0",
