@@ -101,7 +101,34 @@ export async function ReplayView({ matchId }: { matchId: string }) {
           </table>
         </div>
       </section>
+
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="text-base font-medium">Seats</h2>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="py-2 pr-4 font-medium">Seat</th>
+                <th className="py-2 pr-4 font-medium">Agent</th>
+                <th className="py-2 pr-4 font-medium">Strategy</th>
+                <th className="py-2 pr-4 font-medium">Agent ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.seats.map((s) => (
+                <tr key={s.seat_id} className="border-t border-border">
+                  <td className="py-2 pr-4">{s.seat_id}</td>
+                  <td className="py-2 pr-4">{s.agent_name}</td>
+                  <td className="py-2 pr-4">{s.strategy}</td>
+                  <td className="py-2 pr-4 text-muted-foreground">
+                    {s.agent_id ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   );
 }
-
