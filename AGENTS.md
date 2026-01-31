@@ -15,4 +15,4 @@
 - Work one epic at a time; implement in small, safe increments.
 - Keep builds/tests green; prefer simple, clear code.
 - Every user-facing feature ships with empty/loading/error states + basic accessibility.
-- Architectural changes require an ADR in `docs/_private/adr/`.
+- Architectural changes require an ADR in `docs/adr/`.
