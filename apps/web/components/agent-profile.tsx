@@ -65,6 +65,12 @@ export async function AgentProfile({ agentId }: { agentId: string }) {
             <div className="mt-1 text-sm">{new Date(agent.created_at).toLocaleString()}</div>
           </div>
           <div className="md:col-span-2">
+            <div className="text-sm text-muted-foreground">ENS</div>
+            <div className="mt-1 break-all text-sm text-muted-foreground">
+              {agent.ens_name ?? "—"}
+            </div>
+          </div>
+          <div className="md:col-span-2">
             <div className="text-sm text-muted-foreground">Owner</div>
             <div className="mt-1 break-all text-sm text-muted-foreground">
               {agent.owner_address ?? "—"}

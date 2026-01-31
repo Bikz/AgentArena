@@ -13,6 +13,7 @@ type Agent = {
   name: string;
   model: string;
   strategy: Strategy;
+  ens_name?: string | null;
 };
 
 export function Lobby() {
@@ -44,6 +45,7 @@ export function Lobby() {
           name: String(a.name),
           model: String(a.model),
           strategy: a.strategy as Strategy,
+          ens_name: (a as any).ens_name ?? null,
         }));
         if (cancelled) return;
         setAgents(list);
@@ -168,6 +170,7 @@ export function Lobby() {
                   >
                     {agents.map((a) => (
                       <option key={a.id} value={a.id}>
+                        {a.ens_name ? `${a.ens_name} · ` : ""}
                         {a.name} · {a.strategy} · {a.model}
                       </option>
                     ))}

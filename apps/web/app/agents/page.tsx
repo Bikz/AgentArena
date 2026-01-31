@@ -9,6 +9,7 @@ type Agent = {
   model: string;
   strategy: "hold" | "random" | "trend" | "mean_revert";
   owner_address?: string | null;
+  ens_name?: string | null;
 };
 
 async function fetchAgents(): Promise<Agent[] | null> {
@@ -61,6 +62,7 @@ export default async function AgentsPage() {
               <thead className="text-muted-foreground">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Name</th>
+                  <th className="py-2 pr-4 font-medium">ENS</th>
                   <th className="py-2 pr-4 font-medium">Owner</th>
                   <th className="py-2 pr-4 font-medium">Strategy</th>
                   <th className="py-2 pr-4 font-medium">Model</th>
@@ -77,6 +79,9 @@ export default async function AgentsPage() {
                       >
                         {a.name}
                       </Link>
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {a.ens_name ?? "—"}
                     </td>
                     <td className="py-2 pr-4 text-muted-foreground">
                       {a.owner_address
