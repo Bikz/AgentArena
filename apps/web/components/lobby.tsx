@@ -87,12 +87,20 @@ export function Lobby() {
           </button>
 
           {match ? (
-            <Link
-              href={`/match/${match.matchId}`}
-              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-            >
-              View latest match ({match.phase})
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/match/${match.matchId}`}
+                className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+              >
+                Live match ({match.phase})
+              </Link>
+              <Link
+                href={`/replay/${match.matchId}`}
+                className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+              >
+                Replay
+              </Link>
+            </div>
           ) : (
             <div className="text-sm text-muted-foreground">No match yet.</div>
           )}
@@ -101,4 +109,3 @@ export function Lobby() {
     </section>
   );
 }
-
