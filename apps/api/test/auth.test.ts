@@ -20,6 +20,7 @@ describe("auth", () => {
     expect(nonce).toMatch(/^[0-9a-f]{32}$/);
 
     const cookie = getSetCookie(nonceRes.headers as any);
+    if (!cookie) throw new Error("missing set-cookie");
     expect(cookie).toContain("agentarena_session=");
 
     const account = privateKeyToAccount(
@@ -41,7 +42,8 @@ describe("auth", () => {
       payload: { message, signature },
     });
     expect(verifyRes.statusCode).toBe(200);
-    const authedCookie = getSetCookie(verifyRes.headers as any) ?? cookie;
+    const authedCookie = getSetCookie(verifyRes.headers as any);
+    if (!authedCookie) throw new Error("missing auth set-cookie");
 
     const meRes = await app.inject({
       method: "GET",
