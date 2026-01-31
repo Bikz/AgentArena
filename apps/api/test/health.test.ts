@@ -11,3 +11,12 @@ describe("GET /health", () => {
   });
 });
 
+describe("GET /agents (no db)", () => {
+  it("returns 501 when DB is not configured", async () => {
+    const app = buildApp();
+    const res = await app.inject({ method: "GET", url: "/agents" });
+    expect(res.statusCode).toBe(501);
+    expect(res.json()).toEqual({ error: "db_not_configured" });
+    await app.close();
+  });
+});
