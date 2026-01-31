@@ -68,7 +68,14 @@ export default async function AgentsPage() {
               <tbody>
                 {agents.map((a) => (
                   <tr key={a.id} className="border-t border-border">
-                    <td className="py-2 pr-4">{a.name}</td>
+                    <td className="py-2 pr-4">
+                      <Link
+                        href={`/agents/${a.id}`}
+                        className="underline-offset-4 hover:underline"
+                      >
+                        {a.name}
+                      </Link>
+                    </td>
                     <td className="py-2 pr-4">{a.strategy}</td>
                     <td className="py-2 pr-4">{a.model}</td>
                     <td className="py-2 pr-4">
@@ -90,4 +97,3 @@ export default async function AgentsPage() {
     </main>
   );
 }
-
