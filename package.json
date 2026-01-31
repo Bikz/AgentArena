@@ -5,9 +5,8 @@
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -C packages/shared build && pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "pnpm -r format"
   }
 }
-
