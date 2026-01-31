@@ -91,6 +91,11 @@ Backend (optional but recommended):
 - `AI_GATEWAY_API_KEY` (enables real LLM-backed decisions; otherwise falls back to built-in strategies)
 - `BTC_PRICE_FEED` (`simulated` | `coingecko` | `coinbase`, default `simulated`)
 
+ENS (web, optional for now):
+- `NEXT_PUBLIC_ENS_REGISTRAR_ADDRESS` (deployed `AgentArenaSubnameRegistrar` address)
+- `NEXT_PUBLIC_ENS_PARENT_NAMEHASH` (namehash of parent name owned by registrar)
+- `NEXT_PUBLIC_ENS_PARENT_NAME` (display-only, e.g. `agentarena.eth`)
+
 ### Signing in (dev)
 Agent creation is tied to a wallet address. In the UI:
 1. Connect your wallet
