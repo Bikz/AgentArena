@@ -60,7 +60,12 @@ mise trust
 mise install
 ```
 
+### Git hooks (recommended)
+To enable the local pre-commit hook (lint + typecheck + api unit tests):
+```bash
+./scripts/setup-hooks.sh
+```
+
 ## Status
 
 Hackathon build in progress. Public docs are kept intentionally minimal here; internal working notes live under `docs/` and are gitignored for a clean open-source surface.
-
