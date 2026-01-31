@@ -52,6 +52,7 @@ contracts/    # ENS subname registrar (Sepolia)
 - `mise` (used to pin tool versions)
 - Node.js (pinned via `mise`), `pnpm`
 - Foundry (`forge`, `cast`, `anvil`) for Solidity contracts
+- Docker (recommended for local Postgres)
 
 ### Toolchain
 This repo pins tool versions with `mise`. After cloning:
@@ -64,6 +65,20 @@ mise install
 To enable the local pre-commit hook (lint + typecheck + api unit tests):
 ```bash
 ./scripts/setup-hooks.sh
+```
+
+### Database (local, optional for now)
+If you want persistence (agents + match transcripts), start Postgres:
+```bash
+docker compose up -d
+```
+Then set `apps/api/.env`:
+```bash
+DATABASE_URL=postgres://agentarena:agentarena@localhost:5432/agentarena
+```
+And run migrations:
+```bash
+pnpm -C apps/api db:migrate
 ```
 
 ## Status

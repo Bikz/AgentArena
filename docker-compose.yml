@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: agentarena
+      POSTGRES_PASSWORD: agentarena
+      POSTGRES_DB: agentarena
+    ports:
+      - "5432:5432"
+    volumes:
+      - agentarena_pg:/var/lib/postgresql/data
+
+volumes:
+  agentarena_pg:
+
