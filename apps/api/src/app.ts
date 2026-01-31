@@ -21,6 +21,7 @@ import {
   upsertSeat,
 } from "./db/repo.js";
 import { decideSeatTarget } from "./agents/decide-seat.js";
+import { createBtcUsdPriceFeed } from "./prices/btc-usd.js";
 
 type WsRawData = string | Buffer | ArrayBuffer | Buffer[];
 type WsClient = {
@@ -132,6 +133,8 @@ export function buildApp() {
     return agent;
   };
 
+  const btcFeed = createBtcUsdPriceFeed();
+
   const engine = new MatchEngine(
     (matchId, event) => broadcastToMatch(matchId, event),
     (event) => broadcastToAll(event),
@@ -168,6 +171,13 @@ export function buildApp() {
         rng,
         timeoutMs,
       });
+    },
+    async ({ match }) => {
+      const res = await btcFeed({
+        matchId: match.config.matchId,
+        prevPriceUsd: match.price,
+      });
+      return { price: res.priceUsd, source: res.source };
     },
     pool
       ? {

@@ -2,6 +2,11 @@ import type { AgentDecision, MatchTick, ServerEvent } from "@agent-arena/shared"
 
 export type Strategy = "hold" | "random" | "trend" | "mean_revert";
 
+export type PriceFeed = (input: {
+  match: MatchState;
+  timeoutMs: number;
+}) => Promise<{ price: number; source?: string }>;
+
 export type Seat = {
   seatId: string;
   agentId?: string;
@@ -81,6 +86,7 @@ export class MatchEngine {
     private readonly broadcast: Broadcast,
     private readonly broadcastAll: BroadcastAll,
     private readonly decideSeat?: SeatDecider,
+    private readonly priceFeed?: PriceFeed,
     private readonly hooks?: EngineHooks,
   ) {}
 
@@ -200,11 +206,16 @@ export class MatchEngine {
       if (!current || current.phase !== "running") return;
 
       const tickStartedAt = Date.now();
+      const feedTimeoutMs = Math.max(250, Math.floor(current.config.tickIntervalMs / 2));
 
       const nextTick = current.tick + 1;
       const prev = current.price;
-      const drift = (rng() - 0.5) * 350; // placeholder volatility
-      const nextPrice = Math.max(1, prev + drift);
+      const nextPrice = await this.getNextPrice({
+        match: current,
+        prev,
+        rng,
+        timeoutMs: feedTimeoutMs,
+      });
 
       current.tick = nextTick;
       current.prevPrice = prev;
@@ -331,5 +342,29 @@ export class MatchEngine {
     this.runningTimerByMatchId.clear();
     this.matchById.clear();
     this.queue = [];
+  }
+
+  private async getNextPrice(input: {
+    match: MatchState;
+    prev: number;
+    rng: () => number;
+    timeoutMs: number;
+  }) {
+    if (!this.priceFeed) {
+      const drift = (input.rng() - 0.5) * 350;
+      return Math.max(1, input.prev + drift);
+    }
+
+    try {
+      const res = await this.priceFeed({ match: input.match, timeoutMs: input.timeoutMs });
+      if (typeof res.price === "number" && Number.isFinite(res.price) && res.price > 0) {
+        return res.price;
+      }
+    } catch {
+      // fall through
+    }
+
+    const drift = (input.rng() - 0.5) * 350;
+    return Math.max(1, input.prev + drift);
   }
 }
