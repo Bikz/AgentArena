@@ -21,7 +21,7 @@ export type SeatContext = {
   tick: number;
   tickIntervalMs: number;
   maxTicks: number;
-  priceHistory: number[];
+  priceHistory: readonly number[];
   latestTick: MatchTick;
   credits: number;
 };
