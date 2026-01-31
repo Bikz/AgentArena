@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { apiBaseHttp } from "@/lib/api";
+import { ClaimEnsCard } from "@/components/claim-ens-card";
 
 type Agent = {
   id: string;
@@ -9,6 +10,10 @@ type Agent = {
   model: string;
   strategy: "hold" | "random" | "trend" | "mean_revert";
   owner_address?: string | null;
+  ens_name?: string | null;
+  ens_node?: string | null;
+  ens_tx_hash?: string | null;
+  ens_claimed_at?: string | null;
 };
 
 async function fetchAgent(agentId: string): Promise<Agent | null> {
@@ -73,6 +78,8 @@ export async function AgentProfile({ agentId }: { agentId: string }) {
           </div>
         </div>
       </section>
+
+      <ClaimEnsCard agent={agent} />
     </main>
   );
 }
