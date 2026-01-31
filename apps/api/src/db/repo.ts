@@ -6,6 +6,7 @@ export type AgentRow = {
   created_at: string;
   name: string;
   prompt: string;
+  prompt_hash?: string | null;
   model: string;
   strategy: string;
   owner_address?: string | null;
@@ -19,9 +20,13 @@ export function newId(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
 
+export function promptHash(prompt: string) {
+  return `0x${crypto.createHash("sha256").update(prompt).digest("hex")}`;
+}
+
 export async function listAgents(pool: Pool) {
   const res = await pool.query<AgentRow>(
-    "select id, created_at, name, prompt, model, strategy, owner_address, ens_name, ens_node, ens_tx_hash, ens_claimed_at from agents order by created_at desc limit 100",
+    "select id, created_at, name, prompt_hash, model, strategy, owner_address, ens_name, ens_node, ens_tx_hash, ens_claimed_at from agents order by created_at desc limit 100",
   );
   return res.rows;
 }
@@ -37,16 +42,25 @@ export async function createAgent(
   },
 ) {
   const id = newId("agent");
+  const pHash = promptHash(input.prompt);
   await pool.query(
-    "insert into agents (id, name, prompt, model, strategy, owner_address) values ($1, $2, $3, $4, $5, $6)",
-    [id, input.name, input.prompt, input.model, input.strategy, input.ownerAddress],
+    "insert into agents (id, name, prompt, prompt_hash, model, strategy, owner_address) values ($1, $2, $3, $4, $5, $6, $7)",
+    [
+      id,
+      input.name,
+      input.prompt,
+      pHash,
+      input.model,
+      input.strategy,
+      input.ownerAddress,
+    ],
   );
   return id;
 }
 
 export async function getAgent(pool: Pool, agentId: string) {
   const res = await pool.query<AgentRow>(
-    "select id, created_at, name, prompt, model, strategy, owner_address, ens_name, ens_node, ens_tx_hash, ens_claimed_at from agents where id=$1",
+    "select id, created_at, name, prompt, prompt_hash, model, strategy, owner_address, ens_name, ens_node, ens_tx_hash, ens_claimed_at from agents where id=$1",
     [agentId],
   );
   return res.rows[0] ?? null;
