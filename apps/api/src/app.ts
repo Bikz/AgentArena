@@ -1,6 +1,8 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import websocket from "@fastify/websocket";
+import cookie from "@fastify/cookie";
+import secureSession from "@fastify/secure-session";
 import { ClientEventSchema, ServerEventSchema } from "@agent-arena/shared";
 import Fastify from "fastify";
 import {
@@ -22,6 +24,8 @@ import {
 } from "./db/repo.js";
 import { decideSeatTarget } from "./agents/decide-seat.js";
 import { createBtcUsdPriceFeed } from "./prices/btc-usd.js";
+import crypto from "node:crypto";
+import { verifyMessage } from "viem";
 
 type WsRawData = string | Buffer | ArrayBuffer | Buffer[];
 type WsClient = {
@@ -48,10 +52,96 @@ export function buildApp() {
   app.register(helmet);
   app.register(cors, { origin: true, credentials: true });
   app.register(websocket);
+  app.register(cookie);
+  app.register(secureSession as unknown as Parameters<typeof app.register>[0], {
+    cookieName: "agentarena_session",
+    key: (() => {
+      const raw = process.env.SESSION_KEY_BASE64;
+      if (raw) {
+        const buf = Buffer.from(raw, "base64");
+        if (buf.length < 32) throw new Error("SESSION_KEY_BASE64 must be >= 32 bytes");
+        return buf;
+      }
+      // Dev/test fallback: ephemeral key (sessions reset on restart).
+      return crypto.randomBytes(32);
+    })(),
+    expiry: 7 * 24 * 60 * 60,
+    cookie: {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
+  });
 
   const pool = createPool();
 
   app.get("/health", async () => ({ ok: true as const }));
+
+  app.get("/auth/me", async (req) => {
+    const session = req.session as any;
+    const address = session.get("address") as string | undefined;
+    return { address: address ?? null };
+  });
+
+  app.post("/auth/nonce", async (req) => {
+    const session = req.session as any;
+    const nonce = crypto.randomBytes(16).toString("hex");
+    session.set("nonce", nonce);
+    session.touch();
+    return { nonce };
+  });
+
+  const VerifyBody = z.object({
+    message: z.string().min(1).max(2000),
+    signature: z.string().min(1).max(512),
+  });
+  app.post(
+    "/auth/verify",
+    { schema: { body: VerifyBody } },
+    async (req, reply) => {
+      const session = req.session as any;
+      const expectedNonce = session.get("nonce") as string | undefined;
+      if (!expectedNonce)
+        return reply.code(401).send({ error: "missing_nonce" as const });
+
+      const message = req.body.message;
+
+      // Expected format:
+      // Line 1: "<domain> wants you to sign in with your Ethereum account:"
+      // Line 2: "<address>"
+      // ...
+      // "Nonce: <nonce>"
+      const lines = message.split("\n").map((l) => l.trim());
+      const addressLine = lines.find((_, i) => i === 1) ?? "";
+      const address = addressLine as `0x${string}`;
+      if (!address.startsWith("0x") || address.length < 10)
+        return reply.code(400).send({ error: "invalid_message" as const });
+
+      const nonceLine = lines.find((l) => l.toLowerCase().startsWith("nonce:"));
+      const nonce = nonceLine?.split(":")[1]?.trim() ?? "";
+      if (!nonce || nonce !== expectedNonce)
+        return reply.code(401).send({ error: "nonce_mismatch" as const });
+
+      const ok = await verifyMessage({
+        address,
+        message,
+        signature: req.body.signature as `0x${string}`,
+      }).catch(() => false);
+
+      if (!ok) return reply.code(401).send({ error: "invalid_signature" as const });
+
+      session.set("nonce", undefined);
+      session.set("address", address);
+      session.touch();
+      return { ok: true as const, address };
+    },
+  );
+
+  app.post("/auth/logout", async (req) => {
+    (req.session as any).delete();
+    return { ok: true as const };
+  });
 
   app.get("/agents", async (_req, reply) => {
     if (!pool) return reply.code(501).send({ error: "db_not_configured" });
