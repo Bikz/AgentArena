@@ -1,6 +1,7 @@
 "use client";
 
 import { type ServerEvent } from "@agent-arena/shared";
+import Link from "next/link";
 import { useMemo } from "react";
 import { useWsEvents } from "@/hooks/useWsEvents";
 
@@ -84,6 +85,7 @@ export function MatchView({ matchId }: { matchId: string }) {
                   <th className="py-2 pr-4 font-medium">Agent</th>
                   <th className="py-2 pr-4 font-medium">Credits</th>
                   <th className="py-2 pr-4 font-medium">Target</th>
+                  <th className="py-2 pr-4 font-medium">Note</th>
                 </tr>
               </thead>
               <tbody>
@@ -93,9 +95,23 @@ export function MatchView({ matchId }: { matchId: string }) {
                   .map((row, idx) => (
                     <tr key={row.seatId} className="border-t border-border">
                       <td className="py-2 pr-4">{idx + 1}</td>
-                      <td className="py-2 pr-4">{row.agentName}</td>
+                      <td className="py-2 pr-4">
+                        {row.agentId ? (
+                          <Link
+                            href={`/agents/${row.agentId}`}
+                            className="underline underline-offset-4"
+                          >
+                            {row.agentName}
+                          </Link>
+                        ) : (
+                          row.agentName
+                        )}
+                      </td>
                       <td className="py-2 pr-4">{row.credits.toFixed(2)}</td>
                       <td className="py-2 pr-4">{row.target.toFixed(2)}</td>
+                      <td className="py-2 pr-4 text-muted-foreground">
+                        {row.note ?? "—"}
+                      </td>
                     </tr>
                   ))}
               </tbody>

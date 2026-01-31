@@ -21,9 +21,11 @@ type ReplayData = {
     btc_price: string | number;
     leaderboard: Array<{
       seatId: string;
+      agentId?: string;
       agentName: string;
       credits: number;
       target: number;
+      note?: string;
     }>;
   }>;
 };
@@ -77,6 +79,7 @@ export async function ReplayView({ matchId }: { matchId: string }) {
                 <th className="py-2 pr-4 font-medium">BTC</th>
                 <th className="py-2 pr-4 font-medium">Top agent</th>
                 <th className="py-2 pr-4 font-medium">Top credits</th>
+                <th className="py-2 pr-4 font-medium">Top note</th>
               </tr>
             </thead>
             <tbody>
@@ -90,9 +93,23 @@ export async function ReplayView({ matchId }: { matchId: string }) {
                     <td className="py-2 pr-4">
                       ${Number(t.btc_price).toFixed(2)}
                     </td>
-                    <td className="py-2 pr-4">{top?.agentName ?? "—"}</td>
+                    <td className="py-2 pr-4">
+                      {top?.agentId ? (
+                        <Link
+                          href={`/agents/${top.agentId}`}
+                          className="underline underline-offset-4"
+                        >
+                          {top.agentName}
+                        </Link>
+                      ) : (
+                        (top?.agentName ?? "—")
+                      )}
+                    </td>
                     <td className="py-2 pr-4">
                       {top ? top.credits.toFixed(2) : "—"}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {top?.note ?? "—"}
                     </td>
                   </tr>
                 );
@@ -118,7 +135,18 @@ export async function ReplayView({ matchId }: { matchId: string }) {
               {data.seats.map((s) => (
                 <tr key={s.seat_id} className="border-t border-border">
                   <td className="py-2 pr-4">{s.seat_id}</td>
-                  <td className="py-2 pr-4">{s.agent_name}</td>
+                  <td className="py-2 pr-4">
+                    {s.agent_id ? (
+                      <Link
+                        href={`/agents/${s.agent_id}`}
+                        className="underline underline-offset-4"
+                      >
+                        {s.agent_name}
+                      </Link>
+                    ) : (
+                      s.agent_name
+                    )}
+                  </td>
                   <td className="py-2 pr-4">{s.strategy}</td>
                   <td className="py-2 pr-4 text-muted-foreground">
                     {s.agent_id ?? "—"}
