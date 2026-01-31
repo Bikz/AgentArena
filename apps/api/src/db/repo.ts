@@ -8,6 +8,7 @@ export type AgentRow = {
   prompt: string;
   model: string;
   strategy: string;
+  owner_address?: string | null;
 };
 
 export function newId(prefix: string) {
@@ -16,26 +17,32 @@ export function newId(prefix: string) {
 
 export async function listAgents(pool: Pool) {
   const res = await pool.query<AgentRow>(
-    "select id, created_at, name, prompt, model, strategy from agents order by created_at desc limit 100",
+    "select id, created_at, name, prompt, model, strategy, owner_address from agents order by created_at desc limit 100",
   );
   return res.rows;
 }
 
 export async function createAgent(
   pool: Pool,
-  input: { name: string; prompt: string; model: string; strategy: string },
+  input: {
+    name: string;
+    prompt: string;
+    model: string;
+    strategy: string;
+    ownerAddress: string;
+  },
 ) {
   const id = newId("agent");
   await pool.query(
-    "insert into agents (id, name, prompt, model, strategy) values ($1, $2, $3, $4, $5)",
-    [id, input.name, input.prompt, input.model, input.strategy],
+    "insert into agents (id, name, prompt, model, strategy, owner_address) values ($1, $2, $3, $4, $5, $6)",
+    [id, input.name, input.prompt, input.model, input.strategy, input.ownerAddress],
   );
   return id;
 }
 
 export async function getAgent(pool: Pool, agentId: string) {
   const res = await pool.query<AgentRow>(
-    "select id, created_at, name, prompt, model, strategy from agents where id=$1",
+    "select id, created_at, name, prompt, model, strategy, owner_address from agents where id=$1",
     [agentId],
   );
   return res.rows[0] ?? null;

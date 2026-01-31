@@ -172,7 +172,9 @@ export function buildApp() {
     { schema: { body: CreateAgentBody } },
     async (req, reply) => {
       if (!pool) return reply.code(501).send({ error: "db_not_configured" });
-      const id = await createAgent(pool, req.body);
+      const address = (req.session as any).get("address") as string | undefined;
+      if (!address) return reply.code(401).send({ error: "unauthorized" });
+      const id = await createAgent(pool, { ...req.body, ownerAddress: address });
       return { id };
     },
   );
