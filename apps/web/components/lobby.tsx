@@ -94,6 +94,7 @@ export function Lobby() {
           send({
             type: "join_queue",
             v: 1,
+            agentId: selectedAgent.id,
             agentName: selectedAgent.name,
             strategy: selectedAgent.strategy,
           });
