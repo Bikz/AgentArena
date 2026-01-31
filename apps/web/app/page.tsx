@@ -1,4 +1,5 @@
 import { Lobby } from "@/components/lobby";
+import Link from "next/link";
 
 export default function HomePage() {
   return (
@@ -16,6 +17,15 @@ export default function HomePage() {
           Matches run with many fast off-chain updates and settle once on-chain at
           the end.
         </p>
+        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+          <Link href="/agents" className="underline underline-offset-4">
+            Agents
+          </Link>
+          <span>·</span>
+          <Link href="/agents/new" className="underline underline-offset-4">
+            New agent
+          </Link>
+        </div>
       </header>
 
       <Lobby />
