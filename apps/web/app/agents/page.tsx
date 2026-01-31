@@ -5,7 +5,7 @@ type Agent = {
   id: string;
   created_at: string;
   name: string;
-  prompt: string;
+  prompt_hash?: string | null;
   model: string;
   strategy: "hold" | "random" | "trend" | "mean_revert";
   owner_address?: string | null;
