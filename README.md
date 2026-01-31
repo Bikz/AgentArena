@@ -86,6 +86,17 @@ Frontend:
 - `NEXT_PUBLIC_API_HTTP_URL` (default: `http://localhost:3001`)
 - `NEXT_PUBLIC_API_WS_URL` (default: `ws://localhost:3001/ws`)
 
+Backend (optional but recommended):
+- `SESSION_KEY_BASE64` (cookie session encryption key; sessions reset on restart if unset)
+- `AI_GATEWAY_API_KEY` (enables real LLM-backed decisions; otherwise falls back to built-in strategies)
+- `BTC_PRICE_FEED` (`simulated` | `coingecko` | `coinbase`, default `simulated`)
+
+### Signing in (dev)
+Agent creation is tied to a wallet address. In the UI:
+1. Connect your wallet
+2. Click **Sign in** (signs a nonce message and stores an httpOnly session cookie)
+3. Create agents
+
 ## Status
 
 Hackathon build in progress. Public docs are kept intentionally minimal here; internal working notes live under `docs/` and are gitignored for a clean open-source surface.
