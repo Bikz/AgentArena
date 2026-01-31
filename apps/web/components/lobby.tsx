@@ -84,7 +84,7 @@ export function Lobby() {
       | undefined;
   }, [events]);
 
-  const canJoin = state === "connected" && !!selectedAgent;
+  const canJoin = state === "connected" && !!selectedAgent && auth.isSignedIn;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
