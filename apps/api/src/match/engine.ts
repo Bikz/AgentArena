@@ -1,4 +1,4 @@
-import type { ServerEvent } from "@agent-arena/shared";
+import type { AgentDecision, MatchTick, ServerEvent } from "@agent-arena/shared";
 
 export type Strategy = "hold" | "random" | "trend" | "mean_revert";
 
@@ -27,6 +27,7 @@ export type MatchState = {
   tick: number;
   price: number;
   prevPrice: number;
+  priceHistory: number[];
   seats: Seat[];
   createdAt: number;
   startedAt?: number;
@@ -35,6 +36,13 @@ export type MatchState = {
 
 type Broadcast = (matchId: string, event: ServerEvent) => void;
 type BroadcastAll = (event: ServerEvent) => void;
+export type SeatDecider = (input: {
+  seat: Seat;
+  match: MatchState;
+  latestTick: MatchTick;
+  timeoutMs: number;
+  rng: () => number;
+}) => Promise<AgentDecision>;
 type EngineHooks = {
   onMatchCreated?: (match: MatchState) => void | Promise<void>;
   onTick?: (match: MatchState) => void | Promise<void>;
@@ -64,12 +72,6 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function sign(n: number) {
-  if (n > 0) return 1;
-  if (n < 0) return -1;
-  return 0;
-}
-
 export class MatchEngine {
   private matchById = new Map<string, MatchState>();
   private queue: Array<Pick<Seat, "agentId" | "agentName" | "strategy">> = [];
@@ -78,6 +80,7 @@ export class MatchEngine {
   constructor(
     private readonly broadcast: Broadcast,
     private readonly broadcastAll: BroadcastAll,
+    private readonly decideSeat?: SeatDecider,
     private readonly hooks?: EngineHooks,
   ) {}
 
@@ -142,6 +145,7 @@ export class MatchEngine {
       tick: 0,
       price: config.startPrice,
       prevPrice: config.startPrice,
+      priceHistory: [config.startPrice],
       seats,
       createdAt: Date.now(),
     };
@@ -176,10 +180,26 @@ export class MatchEngine {
 
     const rng = mulberry32(hashStringToSeed(matchId));
 
-    const timer = setInterval(() => {
+    this.broadcastAll({
+      type: "match_status",
+      v: 1,
+      matchId,
+      phase: match.phase,
+      seats: match.seats.map((s) => ({
+        seatId: s.seatId,
+        agentId: s.agentId,
+        agentName: s.agentName,
+        strategy: s.strategy,
+      })),
+      tickIntervalMs: match.config.tickIntervalMs,
+      maxTicks: match.config.maxTicks,
+    });
+
+    const runTick = async () => {
       const current = this.matchById.get(matchId);
-      if (!current) return;
-      if (current.phase !== "running") return;
+      if (!current || current.phase !== "running") return;
+
+      const tickStartedAt = Date.now();
 
       const nextTick = current.tick + 1;
       const prev = current.price;
@@ -189,20 +209,22 @@ export class MatchEngine {
       current.tick = nextTick;
       current.prevPrice = prev;
       current.price = nextPrice;
+      current.priceHistory = [...current.priceHistory, nextPrice].slice(-20);
 
-      this.applyStrategies(current, rng);
+      // Score based on prior target over the last interval.
       this.applyScoring(current);
 
-      this.broadcast(matchId, {
-        type: "tick",
-        tick: {
-          matchId,
-          tick: current.tick,
-          ts: Date.now(),
-          btcPrice: current.price,
-        },
-      });
+      const latestTick: MatchTick = {
+        matchId,
+        tick: current.tick,
+        ts: Date.now(),
+        btcPrice: current.price,
+      };
 
+      // Decide next target for the upcoming interval (defaults to HOLD).
+      await this.applyDecisions(current, latestTick, rng);
+
+      this.broadcast(matchId, { type: "tick", tick: latestTick });
       this.broadcast(matchId, {
         type: "leaderboard",
         matchId,
@@ -225,7 +247,7 @@ export class MatchEngine {
         current.phase = "finished";
         current.finishedAt = Date.now();
         const active = this.runningTimerByMatchId.get(matchId);
-        if (active) clearInterval(active);
+        if (active) clearTimeout(active);
         this.runningTimerByMatchId.delete(matchId);
 
         void Promise.resolve(this.hooks?.onFinished?.(current)).catch((err) =>
@@ -246,24 +268,51 @@ export class MatchEngine {
           tickIntervalMs: current.config.tickIntervalMs,
           maxTicks: current.config.maxTicks,
         });
+        return;
       }
-    }, match.config.tickIntervalMs);
 
-    this.runningTimerByMatchId.set(matchId, timer);
+      const elapsed = Date.now() - tickStartedAt;
+      const delay = Math.max(0, current.config.tickIntervalMs - elapsed);
+      const timer = setTimeout(() => void runTick(), delay);
+      this.runningTimerByMatchId.set(matchId, timer);
+    };
+
+    const firstDelay = Math.min(250, match.config.tickIntervalMs);
+    const first = setTimeout(() => void runTick(), firstDelay);
+    this.runningTimerByMatchId.set(matchId, first);
   }
 
-  private applyStrategies(match: MatchState, rng: () => number) {
-    const delta = match.price - match.prevPrice;
-    const d = sign(delta);
+  private async applyDecisions(
+    match: MatchState,
+    latestTick: MatchTick,
+    rng: () => number,
+  ) {
+    const timeoutMs = Math.max(250, match.config.tickIntervalMs - 100);
 
-    for (const seat of match.seats) {
-      let nextTarget = seat.target;
-      if (seat.strategy === "hold") nextTarget = 0;
-      if (seat.strategy === "random") nextTarget = rng() * 2 - 1;
-      if (seat.strategy === "trend") nextTarget = d * 0.5;
-      if (seat.strategy === "mean_revert") nextTarget = -d * 0.5;
-      seat.target = clamp(nextTarget, -1, 1);
-    }
+    await Promise.all(
+      match.seats.map(async (seat) => {
+        if (!this.decideSeat) {
+          seat.target = 0;
+          seat.note = "hold";
+          return;
+        }
+
+        try {
+          const decision = await this.decideSeat({
+            seat,
+            match,
+            latestTick,
+            timeoutMs,
+            rng,
+          });
+          seat.target = clamp(decision.target, -1, 1);
+          seat.note = decision.note;
+        } catch {
+          seat.target = 0;
+          seat.note = "hold";
+        }
+      }),
+    );
   }
 
   private applyScoring(match: MatchState) {

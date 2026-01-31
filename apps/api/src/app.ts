@@ -20,6 +20,7 @@ import {
   upsertMatch,
   upsertSeat,
 } from "./db/repo.js";
+import { decideSeatTarget } from "./agents/decide-seat.js";
 
 type WsRawData = string | Buffer | ArrayBuffer | Buffer[];
 type WsClient = {
@@ -121,9 +122,53 @@ export function buildApp() {
     }
   };
 
+  const agentCache = new Map<string, Awaited<ReturnType<typeof getAgent>>>();
+  const resolveAgent = async (agentId: string) => {
+    if (!pool) return null;
+    const cached = agentCache.get(agentId);
+    if (cached) return cached;
+    const agent = await getAgent(pool, agentId);
+    if (agent) agentCache.set(agentId, agent);
+    return agent;
+  };
+
   const engine = new MatchEngine(
     (matchId, event) => broadcastToMatch(matchId, event),
     (event) => broadcastToAll(event),
+    async ({ seat, match, latestTick, timeoutMs, rng }) => {
+      const agent = seat.agentId ? await resolveAgent(seat.agentId) : null;
+      const agentStrategy =
+        agent &&
+        (agent.strategy === "hold" ||
+          agent.strategy === "random" ||
+          agent.strategy === "trend" ||
+          agent.strategy === "mean_revert")
+          ? agent.strategy
+          : null;
+      return decideSeatTarget({
+        agent: agent
+          ? {
+              id: agent.id,
+              name: agent.name,
+              prompt: agent.prompt,
+              model: agent.model,
+              strategy: agentStrategy ?? seat.strategy,
+            }
+          : null,
+        strategy: seat.strategy,
+        ctx: {
+          matchId: match.config.matchId,
+          tick: match.tick,
+          tickIntervalMs: match.config.tickIntervalMs,
+          maxTicks: match.config.maxTicks,
+          priceHistory: match.priceHistory,
+          latestTick,
+          credits: seat.credits,
+        },
+        rng,
+        timeoutMs,
+      });
+    },
     pool
       ? {
           onError: (err) => app.log.error({ err }, "engine persistence error"),
