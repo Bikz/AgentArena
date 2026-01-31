@@ -27,3 +27,22 @@ jobs:
       - name: Unit tests
         run: pnpm -C apps/api test
 
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          mise_toml: .mise.toml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Dependency audit (high+)
+        run: pnpm audit --audit-level=high
