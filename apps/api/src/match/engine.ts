@@ -12,6 +12,7 @@ export type Seat = {
   agentId?: string;
   agentName: string;
   strategy: Strategy;
+  ownerAddress?: string;
   credits: number;
   target: number;
   note?: string;
@@ -79,7 +80,11 @@ function clamp(n: number, min: number, max: number) {
 
 export class MatchEngine {
   private matchById = new Map<string, MatchState>();
-  private queue: Array<Pick<Seat, "agentId" | "agentName" | "strategy">> = [];
+  private queue: Array<
+    Pick<Seat, "agentId" | "agentName" | "strategy" | "ownerAddress"> & {
+      clientId: string;
+    }
+  > = [];
   private runningTimerByMatchId = new Map<string, NodeJS.Timeout>();
 
   constructor(
@@ -105,8 +110,17 @@ export class MatchEngine {
     return matches[0]?.config.matchId;
   }
 
-  joinQueue(input: { agentId?: string; agentName: string; strategy: Strategy }) {
+  joinQueue(input: {
+    clientId: string;
+    ownerAddress?: string;
+    agentId?: string;
+    agentName: string;
+    strategy: Strategy;
+  }) {
+    if (this.queue.some((q) => q.clientId === input.clientId)) return;
     this.queue.push({
+      clientId: input.clientId,
+      ownerAddress: input.ownerAddress,
       agentId: input.agentId,
       agentName: input.agentName,
       strategy: input.strategy,
@@ -125,22 +139,27 @@ export class MatchEngine {
     }
   }
 
-  leaveQueue() {
-    // For now: remove one seat from the back (we don't identify the caller yet).
-    if (this.queue.length === 0) return;
-    this.queue.pop();
+  leaveQueue(clientId: string) {
+    const next = this.queue.filter((q) => q.clientId !== clientId);
+    if (next.length === this.queue.length) return;
+    this.queue = next;
     this.broadcastAll({ type: "queue", v: 1, queueSize: this.queue.length });
   }
 
   private createAndStartMatch(
     config: MatchConfig,
-    queued: Array<Pick<Seat, "agentId" | "agentName" | "strategy">>,
+    queued: Array<
+      Pick<Seat, "agentId" | "agentName" | "strategy" | "ownerAddress"> & {
+        clientId: string;
+      }
+    >,
   ) {
     const seats: Seat[] = queued.map((q, idx) => ({
       seatId: String(idx + 1),
       agentId: q.agentId,
       agentName: q.agentName,
       strategy: q.strategy,
+      ownerAddress: q.ownerAddress,
       credits: 1000,
       target: 0,
     }));

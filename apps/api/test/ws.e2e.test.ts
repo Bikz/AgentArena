@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ServerEventSchema } from "@agent-arena/shared";
 import { buildApp } from "../src/app.js";
+import { privateKeyToAccount } from "viem/accounts";
 
 async function waitFor<T>(
   fn: () => T | undefined,
@@ -15,30 +16,73 @@ async function waitFor<T>(
   throw new Error("timeout");
 }
 
+function getSetCookie(headers: Record<string, unknown>) {
+  const raw = headers["set-cookie"];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== "string" || !value) return null;
+  return value.split(";")[0]!;
+}
+
 describe("ws e2e", () => {
   it("can join queue and receive match events", async () => {
     const app = buildApp();
     await app.ready();
 
-    const received: unknown[] = [];
-    const socket = (await (app as any).injectWS("/ws?clientId=test", {}, {
-      onOpen: (ws: { on: (event: string, cb: (data: unknown) => void) => void }) => {
-        ws.on("message", (data: unknown) => {
-          try {
-            received.push(JSON.parse(String(data)));
-          } catch {
-            // ignore
-          }
-        });
-      },
-    })) as {
-      on: (event: string, cb: (data: unknown) => void) => void;
+    // Authenticate once, reuse the session cookie for all clients (localhost cookies ignore port).
+    const nonceRes = await app.inject({ method: "POST", url: "/auth/nonce" });
+    const nonceCookie = getSetCookie(nonceRes.headers as any);
+    if (!nonceCookie) throw new Error("missing nonce cookie");
+
+    const { nonce } = nonceRes.json() as { nonce: string };
+    const account = privateKeyToAccount(
+      "0x59c6995e998f97a5a0044966f094538eeb94b3f5f2b2c3a8d9b8b8b8b8b8b8b8",
+    );
+    const message =
+      `agentarena.local wants you to sign in with your Ethereum account:\n` +
+      `${account.address}\n\n` +
+      `Nonce: ${nonce}\n` +
+      `Issued At: 2026-01-31T00:00:00.000Z\n`;
+    const signature = await account.signMessage({ message });
+
+    const verifyRes = await app.inject({
+      method: "POST",
+      url: "/auth/verify",
+      headers: { cookie: nonceCookie },
+      payload: { message, signature },
+    });
+    const authedCookie = getSetCookie(verifyRes.headers as any);
+    if (!authedCookie) throw new Error("missing auth cookie");
+
+    const sockets: Array<{
       send: (data: string) => void;
       close: () => void;
-    };
+    }> = [];
+    const received: unknown[] = [];
 
-    // Fill the queue to trigger a match.
+    // Open 5 clients and join queue (match auto-starts at 5 seats).
     for (let i = 0; i < 5; i += 1) {
+      const clientId = `test-${i + 1}`;
+      const socket = (await (app as any).injectWS(
+        `/ws?clientId=${clientId}`,
+        { headers: { cookie: authedCookie } },
+        {
+          onOpen: (ws: {
+            on: (event: string, cb: (data: unknown) => void) => void;
+          }) => {
+            ws.on("message", (data: unknown) => {
+              try {
+                received.push(JSON.parse(String(data)));
+              } catch {
+                // ignore
+              }
+            });
+          },
+        },
+      )) as {
+        send: (data: string) => void;
+        close: () => void;
+      };
+      sockets.push(socket);
       socket.send(
         JSON.stringify({
           type: "join_queue",
@@ -65,7 +109,7 @@ describe("ws e2e", () => {
     expect(matchStatus.type).toBe("match_status");
     expect(matchStatus.matchId).toMatch(/^match_/);
 
-    socket.send(
+    sockets[0]!.send(
       JSON.stringify({ type: "subscribe", v: 1, matchId: matchStatus.matchId }),
     );
 
@@ -91,7 +135,7 @@ describe("ws e2e", () => {
     expect(leaderboard.type).toBe("leaderboard");
     expect(leaderboard.rows).toHaveLength(5);
 
-    socket.close();
+    for (const socket of sockets) socket.close();
     await app.close();
   });
 });

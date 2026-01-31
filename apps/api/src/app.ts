@@ -33,6 +33,7 @@ type WsClient = {
   send: (data: string) => void;
   close: () => void;
   matchId?: string;
+  address?: string;
 };
 
 export function buildApp() {
@@ -342,10 +343,12 @@ export function buildApp() {
       (socket, req) => {
         const query = req.query as { clientId?: string };
         const clientId = query.clientId ?? "anon";
+        const address = (req.session as any).get("address") as string | undefined;
         req.log.info({ clientId }, "ws connected");
 
         const client: WsClient = {
           id: clientId,
+          address,
           send: (data: string) => socket.send(data),
           close: () => socket.close(),
         };
@@ -397,6 +400,18 @@ export function buildApp() {
             }
 
             if (parsed.data.type === "join_queue") {
+              if (!client.address) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    v: 1,
+                    code: "UNAUTHORIZED",
+                    message: "Sign in before joining the queue.",
+                  }),
+                );
+                return;
+              }
+
               if (pool && parsed.data.agentId) {
                 const agent = await getAgent(pool, parsed.data.agentId);
                 if (!agent) {
@@ -410,7 +425,20 @@ export function buildApp() {
                   );
                   return;
                 }
+                if (agent.owner_address && agent.owner_address !== client.address) {
+                  socket.send(
+                    JSON.stringify({
+                      type: "error",
+                      v: 1,
+                      code: "FORBIDDEN",
+                      message: "Agent does not belong to signed-in wallet.",
+                    }),
+                  );
+                  return;
+                }
                 engine.joinQueue({
+                  clientId: client.id,
+                  ownerAddress: client.address,
                   agentId: agent.id,
                   agentName: agent.name,
                   strategy: agent.strategy as any,
@@ -418,6 +446,8 @@ export function buildApp() {
                 return;
               }
               engine.joinQueue({
+                clientId: client.id,
+                ownerAddress: client.address,
                 agentId: parsed.data.agentId,
                 agentName: parsed.data.agentName,
                 strategy: parsed.data.strategy,
@@ -426,7 +456,7 @@ export function buildApp() {
             }
 
             if (parsed.data.type === "leave_queue") {
-              engine.leaveQueue();
+              engine.leaveQueue(client.id);
               return;
             }
           } catch {
