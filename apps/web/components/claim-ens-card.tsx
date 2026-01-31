@@ -16,12 +16,9 @@ function sanitizeLabel(input: string) {
     .replace(/^-|-$/g, "");
 }
 
-async function sha256Hex(text: string) {
-  const bytes = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+function normalizeSha256DigestHex(input: string) {
+  const v = input.trim().toLowerCase();
+  return v.startsWith("0x") ? v.slice(2) : v;
 }
 
 export function ClaimEnsCard(props: {
@@ -30,7 +27,7 @@ export function ClaimEnsCard(props: {
     name: string;
     model: string;
     strategy: string;
-    prompt: string;
+    prompt_hash?: string | null;
     owner_address?: string | null;
     ens_name?: string | null;
     ens_node?: string | null;
@@ -52,6 +49,13 @@ export function ClaimEnsCard(props: {
     node: `0x${string}`;
   } | null>(null);
 
+  const promptHashHex = useMemo(() => {
+    if (!props.agent.prompt_hash) return null;
+    const hex = normalizeSha256DigestHex(props.agent.prompt_hash);
+    if (!/^[0-9a-f]{64}$/.test(hex)) return null;
+    return hex;
+  }, [props.agent.prompt_hash]);
+
   const canClaim = useMemo(() => {
     return (
       isConnected &&
@@ -61,7 +65,8 @@ export function ClaimEnsCard(props: {
       props.agent.owner_address.toLowerCase() === address.toLowerCase() &&
       registrar &&
       parentNamehash &&
-      label.length > 0
+      label.length > 0 &&
+      Boolean(promptHashHex)
     );
   }, [
     address,
@@ -71,6 +76,7 @@ export function ClaimEnsCard(props: {
     parentNamehash,
     props.agent.owner_address,
     registrar,
+    promptHashHex,
   ]);
 
   const { data: txHash, writeContractAsync, isPending: isWriting } = useWriteContract();
@@ -171,17 +177,22 @@ export function ClaimEnsCard(props: {
         </div>
       )}
 
+      {!promptHashHex && !props.agent.ens_name && (
+        <div className="mt-4 rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+          Missing `prompt_hash` for this agent. Re-save or recreate the agent to
+          enable ENS config records.
+        </div>
+      )}
+
       <div className="mt-4 flex items-center justify-between gap-3">
         <button
           type="button"
           disabled={!canClaim || isWriting || receipt.isLoading || props.agent.ens_name != null}
           onClick={async () => {
-            if (!canClaim || !address || !registrar || !parentNamehash) return;
+            if (!canClaim || !address || !registrar || !parentNamehash || !promptHashHex) return;
             setState("building");
             setError(null);
             try {
-              const promptHash = await sha256Hex(props.agent.prompt);
-
               const keys = [
                 "arena.agentId",
                 "arena.promptHash",
@@ -191,7 +202,7 @@ export function ClaimEnsCard(props: {
               ];
               const values = [
                 props.agent.id,
-                `0x${promptHash}`,
+                `0x${promptHashHex}`,
                 props.agent.model,
                 props.agent.strategy,
                 "v0",

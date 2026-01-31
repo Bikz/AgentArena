@@ -212,7 +212,7 @@ export function AgentProfile({ agentId }: { agentId: string }) {
         )}
       </section>
 
-      {privateAgent ? <ClaimEnsCard agent={privateAgent} /> : null}
+      <ClaimEnsCard agent={publicAgent} />
     </main>
   );
 }
