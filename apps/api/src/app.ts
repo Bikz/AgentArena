@@ -10,6 +10,8 @@ import {
 } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { MatchEngine } from "./match/engine.js";
+import { createPool } from "./db/conn.js";
+import { createAgent, getMatch, listAgents } from "./db/repo.js";
 
 type WsRawData = string | Buffer | ArrayBuffer | Buffer[];
 type WsClient = {
@@ -37,7 +39,38 @@ export function buildApp() {
   app.register(cors, { origin: true, credentials: true });
   app.register(websocket);
 
+  const pool = createPool();
+
   app.get("/health", async () => ({ ok: true as const }));
+
+  app.get("/agents", async (_req, reply) => {
+    if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+    return { agents: await listAgents(pool) };
+  });
+
+  const CreateAgentBody = z.object({
+    name: z.string().min(1).max(64),
+    prompt: z.string().min(1).max(10_000),
+    model: z.string().min(1).max(128),
+  });
+
+  app.post(
+    "/agents",
+    { schema: { body: CreateAgentBody } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const id = await createAgent(pool, req.body);
+      return { id };
+    },
+  );
+
+  app.get("/matches/:matchId", async (req, reply) => {
+    if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+    const matchId = (req.params as any).matchId as string;
+    const data = await getMatch(pool, matchId);
+    if (!data) return reply.code(404).send({ error: "not_found" });
+    return data;
+  });
 
   const wsClients = new Map<string, WsClient>();
 
@@ -179,6 +212,7 @@ export function buildApp() {
   app.addHook("onClose", async () => {
     wsClients.clear();
     engine.close();
+    await pool?.end();
   });
 
   return app;
