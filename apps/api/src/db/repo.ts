@@ -5,7 +5,7 @@ export type AgentRow = {
   id: string;
   created_at: string;
   name: string;
-  prompt: string;
+  prompt?: string | null;
   prompt_hash?: string | null;
   model: string;
   strategy: string;

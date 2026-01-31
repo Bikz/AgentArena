@@ -147,17 +147,57 @@ export function buildApp() {
 
   app.get("/agents", async (_req, reply) => {
     if (!pool) return reply.code(501).send({ error: "db_not_configured" });
-    return { agents: await listAgents(pool) };
+    const agents = await listAgents(pool);
+    return {
+      agents: agents.map((a) => ({
+        id: a.id,
+        created_at: a.created_at,
+        name: a.name,
+        prompt_hash: a.prompt_hash ?? null,
+        model: a.model,
+        strategy: a.strategy,
+        owner_address: a.owner_address ?? null,
+        ens_name: a.ens_name ?? null,
+      })),
+    };
   });
 
   const AgentParams = z.object({ agentId: z.string().min(1) });
   app.get(
-    "/agents/:agentId",
+    "/agents/:agentId/public",
     { schema: { params: AgentParams } },
     async (req, reply) => {
       if (!pool) return reply.code(501).send({ error: "db_not_configured" });
       const agent = await getAgent(pool, req.params.agentId);
       if (!agent) return reply.code(404).send({ error: "not_found" });
+      return {
+        agent: {
+          id: agent.id,
+          created_at: agent.created_at,
+          name: agent.name,
+          prompt_hash: agent.prompt_hash ?? null,
+          model: agent.model,
+          strategy: agent.strategy,
+          owner_address: agent.owner_address ?? null,
+          ens_name: agent.ens_name ?? null,
+          ens_node: agent.ens_node ?? null,
+          ens_tx_hash: agent.ens_tx_hash ?? null,
+          ens_claimed_at: agent.ens_claimed_at ?? null,
+        },
+      };
+    },
+  );
+  app.get(
+    "/agents/:agentId",
+    { schema: { params: AgentParams } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const address = (req.session as any).get("address") as string | undefined;
+      if (!address) return reply.code(401).send({ error: "unauthorized" });
+      const agent = await getAgent(pool, req.params.agentId);
+      if (!agent) return reply.code(404).send({ error: "not_found" });
+      if (agent.owner_address && agent.owner_address !== address)
+        return reply.code(403).send({ error: "forbidden" });
       return { agent };
     },
   );
@@ -276,7 +316,7 @@ export function buildApp() {
           ? {
               id: agent.id,
               name: agent.name,
-              prompt: agent.prompt,
+              prompt: agent.prompt ?? "",
               model: agent.model,
               strategy: agentStrategy ?? seat.strategy,
             }
