@@ -4,6 +4,7 @@ export type Strategy = "hold" | "random" | "trend" | "mean_revert";
 
 export type Seat = {
   seatId: string;
+  agentId?: string;
   agentName: string;
   strategy: Strategy;
   credits: number;
@@ -70,7 +71,7 @@ function sign(n: number) {
 
 export class MatchEngine {
   private matchById = new Map<string, MatchState>();
-  private queue: Array<Pick<Seat, "agentName" | "strategy">> = [];
+  private queue: Array<Pick<Seat, "agentId" | "agentName" | "strategy">> = [];
   private runningTimerByMatchId = new Map<string, NodeJS.Timeout>();
 
   constructor(
@@ -94,8 +95,12 @@ export class MatchEngine {
     return matches[0]?.config.matchId;
   }
 
-  joinQueue(agentName: string, strategy: Strategy) {
-    this.queue.push({ agentName, strategy });
+  joinQueue(input: { agentId?: string; agentName: string; strategy: Strategy }) {
+    this.queue.push({
+      agentId: input.agentId,
+      agentName: input.agentName,
+      strategy: input.strategy,
+    });
     this.broadcastAll({ type: "queue", v: 1, queueSize: this.queue.length });
 
     if (this.queue.length >= 5) {
@@ -119,10 +124,11 @@ export class MatchEngine {
 
   private createAndStartMatch(
     config: MatchConfig,
-    queued: Array<Pick<Seat, "agentName" | "strategy">>,
+    queued: Array<Pick<Seat, "agentId" | "agentName" | "strategy">>,
   ) {
     const seats: Seat[] = queued.map((q, idx) => ({
       seatId: String(idx + 1),
+      agentId: q.agentId,
       agentName: q.agentName,
       strategy: q.strategy,
       credits: 1000,

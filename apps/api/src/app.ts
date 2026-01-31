@@ -126,7 +126,7 @@ export function buildApp() {
               await upsertSeat(pool, {
                 matchId: m.config.matchId,
                 seatId: seat.seatId,
-                agentId: null,
+                agentId: seat.agentId ?? null,
                 agentName: seat.agentName,
                 strategy: seat.strategy,
               });
@@ -234,7 +234,11 @@ export function buildApp() {
             }
 
             if (parsed.data.type === "join_queue") {
-              engine.joinQueue(parsed.data.agentName, parsed.data.strategy);
+              engine.joinQueue({
+                agentId: parsed.data.agentId,
+                agentName: parsed.data.agentName,
+                strategy: parsed.data.strategy,
+              });
               return;
             }
 
