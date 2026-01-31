@@ -74,7 +74,7 @@ docker compose up -d
 ```
 Then set `apps/api/.env`:
 ```bash
-DATABASE_URL=postgres://agentarena:agentarena@localhost:5432/agentarena
+DATABASE_URL=postgres://agentarena:agentarena@localhost:5433/agentarena
 ```
 And run migrations:
 ```bash

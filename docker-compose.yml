@@ -6,10 +6,9 @@ services:
       POSTGRES_PASSWORD: agentarena
       POSTGRES_DB: agentarena
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - agentarena_pg:/var/lib/postgresql/data
 
 volumes:
   agentarena_pg:
-
