@@ -78,6 +78,7 @@ export const ClientEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("join_queue"),
     v: ProtocolVersionSchema,
+    agentId: z.string().min(1).optional(),
     agentName: z.string().min(1).max(32),
     strategy: z.enum(["hold", "random", "trend", "mean_revert"]),
   }),
