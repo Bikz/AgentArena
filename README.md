@@ -81,6 +81,11 @@ And run migrations:
 pnpm -C apps/api db:migrate
 ```
 
+### Environment variables
+Frontend:
+- `NEXT_PUBLIC_API_HTTP_URL` (default: `http://localhost:3001`)
+- `NEXT_PUBLIC_API_WS_URL` (default: `ws://localhost:3001/ws`)
+
 ## Status
 
 Hackathon build in progress. Public docs are kept intentionally minimal here; internal working notes live under `docs/` and are gitignored for a clean open-source surface.

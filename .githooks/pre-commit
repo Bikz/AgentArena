@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.foundry/bin:$PATH"
+
 echo "[pre-commit] lint"
 pnpm -s lint
 
@@ -9,4 +11,3 @@ pnpm -s typecheck
 
 echo "[pre-commit] api tests"
 pnpm -s -C apps/api test
-

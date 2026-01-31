@@ -9,7 +9,6 @@ const __dirname = path.dirname(__filename);
 async function main() {
   const pool = createPool();
   if (!pool) {
-    // eslint-disable-next-line no-console
     console.error("DATABASE_URL is not set");
     process.exit(1);
   }
@@ -36,7 +35,6 @@ async function main() {
       await pool.query(sql);
       await pool.query("insert into _migrations (id) values ($1)", [id]);
       await pool.query("commit");
-      // eslint-disable-next-line no-console
       console.log(`applied ${id}`);
     } catch (err) {
       await pool.query("rollback");
@@ -48,4 +46,3 @@ async function main() {
 }
 
 await main();
-

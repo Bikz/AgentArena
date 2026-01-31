@@ -7,13 +7,12 @@ async function waitFor<T>(
   { timeoutMs }: { timeoutMs: number },
 ) {
   const start = Date.now();
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
+  while (Date.now() - start <= timeoutMs) {
     const value = fn();
     if (value !== undefined) return value;
-    if (Date.now() - start > timeoutMs) throw new Error("timeout");
     await new Promise((r) => setTimeout(r, 10));
   }
+  throw new Error("timeout");
 }
 
 describe("ws e2e", () => {
@@ -22,9 +21,9 @@ describe("ws e2e", () => {
     await app.ready();
 
     const received: unknown[] = [];
-    const socket: any = await (app as any).injectWS("/ws?clientId=test", {}, {
-      onOpen: (ws: any) => {
-        ws.on("message", (data: any) => {
+    const socket = (await (app as any).injectWS("/ws?clientId=test", {}, {
+      onOpen: (ws: { on: (event: string, cb: (data: unknown) => void) => void }) => {
+        ws.on("message", (data: unknown) => {
           try {
             received.push(JSON.parse(String(data)));
           } catch {
@@ -32,7 +31,11 @@ describe("ws e2e", () => {
           }
         });
       },
-    });
+    })) as {
+      on: (event: string, cb: (data: unknown) => void) => void;
+      send: (data: string) => void;
+      close: () => void;
+    };
 
     // Fill the queue to trigger a match.
     for (let i = 0; i < 5; i += 1) {
@@ -50,7 +53,12 @@ describe("ws e2e", () => {
       () =>
         received
           .map((e) => ServerEventSchema.safeParse(e))
-          .find((p) => p.success && p.data.type === "match_status")?.data as any,
+          .find((p) => p.success && p.data.type === "match_status")?.data as
+          | Extract<
+              import("@agent-arena/shared").ServerEvent,
+              { type: "match_status" }
+            >
+          | undefined,
       { timeoutMs: 1500 },
     );
 

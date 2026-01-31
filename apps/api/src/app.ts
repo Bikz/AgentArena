@@ -71,13 +71,17 @@ export function buildApp() {
     },
   );
 
-  app.get("/matches/:matchId", async (req, reply) => {
-    if (!pool) return reply.code(501).send({ error: "db_not_configured" });
-    const matchId = (req.params as any).matchId as string;
-    const data = await getMatch(pool, matchId);
-    if (!data) return reply.code(404).send({ error: "not_found" });
-    return data;
-  });
+  const MatchParams = z.object({ matchId: z.string().min(1) });
+  app.get(
+    "/matches/:matchId",
+    { schema: { params: MatchParams } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const data = await getMatch(pool, req.params.matchId);
+      if (!data) return reply.code(404).send({ error: "not_found" });
+      return data;
+    },
+  );
 
   const wsClients = new Map<string, WsClient>();
 
@@ -173,15 +177,8 @@ export function buildApp() {
         websocket: true,
       },
       (socket, req) => {
-        const queryClientId =
-          typeof (req as any).query?.clientId === "string"
-            ? ((req as any).query.clientId as string)
-            : undefined;
-
-        const rawUrl = req.raw.url ?? "/ws";
-        const base = `http://${req.headers.host ?? "localhost"}`;
-        const url = new URL(rawUrl, base);
-        const clientId = queryClientId ?? url.searchParams.get("clientId") ?? "anon";
+        const query = req.query as { clientId?: string };
+        const clientId = query.clientId ?? "anon";
         req.log.info({ clientId }, "ws connected");
 
         const client: WsClient = {
