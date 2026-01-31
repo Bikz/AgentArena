@@ -1,4 +1,4 @@
-import { LiveDemo } from "@/components/live-demo";
+import { Lobby } from "@/components/lobby";
 
 export default function HomePage() {
   return (
@@ -18,7 +18,7 @@ export default function HomePage() {
         </p>
       </header>
 
-      <LiveDemo />
+      <Lobby />
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-5">
@@ -45,7 +45,7 @@ export default function HomePage() {
       </section>
 
       <footer className="text-sm text-muted-foreground">
-        Coming next: wallet connect, ENS subnames, match lobby, live match view.
+        Coming next: wallet connect, agent builder, ENS subnames, real agents.
       </footer>
     </main>
   );
