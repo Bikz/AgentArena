@@ -19,6 +19,7 @@ import {
   getMatch,
   insertTick,
   listAgents,
+  setAgentEns,
   upsertMatch,
   upsertSeat,
 } from "./db/repo.js";
@@ -158,6 +159,35 @@ export function buildApp() {
       const agent = await getAgent(pool, req.params.agentId);
       if (!agent) return reply.code(404).send({ error: "not_found" });
       return { agent };
+    },
+  );
+
+  const SetEnsBody = z.object({
+    ensName: z.string().min(1).max(255),
+    ensNode: z.string().min(1).max(66),
+    txHash: z.string().min(1).max(66),
+  });
+  app.post(
+    "/agents/:agentId/ens",
+    { schema: { params: AgentParams, body: SetEnsBody } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const address = (req.session as any).get("address") as string | undefined;
+      if (!address) return reply.code(401).send({ error: "unauthorized" });
+
+      const agent = await getAgent(pool, req.params.agentId);
+      if (!agent) return reply.code(404).send({ error: "not_found" });
+      if (agent.owner_address && agent.owner_address !== address)
+        return reply.code(403).send({ error: "forbidden" });
+
+      await setAgentEns(pool, {
+        agentId: agent.id,
+        ownerAddress: address,
+        ensName: req.body.ensName,
+        ensNode: req.body.ensNode,
+        txHash: req.body.txHash,
+      });
+      return { ok: true as const };
     },
   );
 

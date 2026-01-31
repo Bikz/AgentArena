@@ -9,6 +9,10 @@ export type AgentRow = {
   model: string;
   strategy: string;
   owner_address?: string | null;
+  ens_name?: string | null;
+  ens_node?: string | null;
+  ens_tx_hash?: string | null;
+  ens_claimed_at?: string | null;
 };
 
 export function newId(prefix: string) {
@@ -17,7 +21,7 @@ export function newId(prefix: string) {
 
 export async function listAgents(pool: Pool) {
   const res = await pool.query<AgentRow>(
-    "select id, created_at, name, prompt, model, strategy, owner_address from agents order by created_at desc limit 100",
+    "select id, created_at, name, prompt, model, strategy, owner_address, ens_name, ens_node, ens_tx_hash, ens_claimed_at from agents order by created_at desc limit 100",
   );
   return res.rows;
 }
@@ -42,10 +46,31 @@ export async function createAgent(
 
 export async function getAgent(pool: Pool, agentId: string) {
   const res = await pool.query<AgentRow>(
-    "select id, created_at, name, prompt, model, strategy, owner_address from agents where id=$1",
+    "select id, created_at, name, prompt, model, strategy, owner_address, ens_name, ens_node, ens_tx_hash, ens_claimed_at from agents where id=$1",
     [agentId],
   );
   return res.rows[0] ?? null;
+}
+
+export async function setAgentEns(
+  pool: Pool,
+  input: {
+    agentId: string;
+    ownerAddress: string;
+    ensName: string;
+    ensNode: string;
+    txHash: string;
+  },
+) {
+  await pool.query(
+    `update agents
+       set ens_name = $1,
+           ens_node = $2,
+           ens_tx_hash = $3,
+           ens_claimed_at = now()
+     where id = $4 and owner_address = $5`,
+    [input.ensName, input.ensNode, input.txHash, input.agentId, input.ownerAddress],
+  );
 }
 
 export async function getMatch(pool: Pool, matchId: string) {
