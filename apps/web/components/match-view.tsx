@@ -1,18 +1,15 @@
 "use client";
 
 import { type ServerEvent } from "@agent-arena/shared";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useWsEvents } from "@/hooks/useWsEvents";
 
 export function MatchView({ matchId }: { matchId: string }) {
-  const { state, events, send } = useWsEvents({
-    onOpenSend: [{ type: "subscribe", v: 1, matchId }],
-  });
-
-  useEffect(() => {
-    // If the socket reconnects in the future, we'll re-send in onOpenSend.
-    send({ type: "subscribe", v: 1, matchId });
-  }, [matchId, send]);
+  const onOpenSend = useMemo(
+    () => [{ type: "subscribe" as const, v: 1 as const, matchId }],
+    [matchId],
+  );
+  const { state, events } = useWsEvents({ onOpenSend });
 
   const latestTick = useMemo(() => {
     return events.find((e) => e.type === "tick") as
@@ -113,4 +110,3 @@ export function MatchView({ matchId }: { matchId: string }) {
     </main>
   );
 }
-
