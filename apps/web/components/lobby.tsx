@@ -2,15 +2,66 @@
 
 import { type ServerEvent } from "@agent-arena/shared";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWsEvents } from "@/hooks/useWsEvents";
 
 type Strategy = "hold" | "random" | "trend" | "mean_revert";
+type Agent = {
+  id: string;
+  name: string;
+  model: string;
+  strategy: Strategy;
+};
 
 export function Lobby() {
-  const [agentName, setAgentName] = useState("MyAgent");
-  const [strategy, setStrategy] = useState<Strategy>("trend");
+  const [agents, setAgents] = useState<Agent[] | null>(null);
+  const [agentsState, setAgentsState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+
   const { state, events, send } = useWsEvents();
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setAgentsState("loading");
+      try {
+        const base =
+          process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
+        const res = await fetch(`${base}/agents`, { cache: "no-store" });
+        if (!res.ok) {
+          setAgents(null);
+          setAgentsState("error");
+          return;
+        }
+        const json = (await res.json()) as { agents: any[] };
+        const list: Agent[] = (json.agents ?? []).map((a) => ({
+          id: String(a.id),
+          name: String(a.name),
+          model: String(a.model),
+          strategy: a.strategy as Strategy,
+        }));
+        if (cancelled) return;
+        setAgents(list);
+        setAgentsState("ready");
+        if (!selectedAgentId && list.length > 0) setSelectedAgentId(list[0]!.id);
+      } catch {
+        if (cancelled) return;
+        setAgents(null);
+        setAgentsState("error");
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const selectedAgent = useMemo(() => {
+    return agents?.find((a) => a.id === selectedAgentId) ?? null;
+  }, [agents, selectedAgentId]);
 
   const queue = useMemo(() => {
     return events.find((e) => e.type === "queue") as
@@ -24,7 +75,7 @@ export function Lobby() {
       | undefined;
   }, [events]);
 
-  const canJoin = state === "connected" && agentName.trim().length > 0;
+  const canJoin = state === "connected" && !!selectedAgent;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
@@ -43,38 +94,53 @@ export function Lobby() {
           send({
             type: "join_queue",
             v: 1,
-            agentName: agentName.trim(),
-            strategy,
+            agentName: selectedAgent.name,
+            strategy: selectedAgent.strategy,
           });
         }}
       >
-        <div className="md:col-span-2">
-          <label className="text-sm text-muted-foreground" htmlFor="agentName">
-            Agent name
-          </label>
-          <input
-            id="agentName"
-            value={agentName}
-            onChange={(e) => setAgentName(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
-            placeholder="MyAgent"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-muted-foreground" htmlFor="strategy">
-            Strategy (demo)
-          </label>
-          <select
-            id="strategy"
-            value={strategy}
-            onChange={(e) => setStrategy(e.target.value as Strategy)}
-            className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="trend">trend</option>
-            <option value="mean_revert">mean_revert</option>
-            <option value="random">random</option>
-            <option value="hold">hold</option>
-          </select>
+        <div className="md:col-span-3">
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <label className="text-sm text-muted-foreground" htmlFor="agent">
+                Agent
+              </label>
+              <div className="mt-1">
+                {agentsState === "loading" ? (
+                  <div className="rounded-xl border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                    Loading agents…
+                  </div>
+                ) : agentsState === "error" ? (
+                  <div className="rounded-xl border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                    Agents unavailable. Start DB + API, then refresh.
+                  </div>
+                ) : agents && agents.length > 0 ? (
+                  <select
+                    id="agent"
+                    value={selectedAgentId}
+                    onChange={(e) => setSelectedAgentId(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} · {a.strategy} · {a.model}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="rounded-xl border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                    No agents yet.
+                  </div>
+                )}
+              </div>
+            </div>
+            <Link
+              href="/agents/new"
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              New agent
+            </Link>
+          </div>
         </div>
 
         <div className="md:col-span-3 flex items-center justify-between">
