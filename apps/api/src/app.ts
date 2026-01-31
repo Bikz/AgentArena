@@ -160,9 +160,11 @@ export function buildApp() {
               btcPrice: m.price,
               leaderboard: m.seats.map((s) => ({
                 seatId: s.seatId,
+                agentId: s.agentId,
                 agentName: s.agentName,
                 credits: s.credits,
                 target: s.target,
+                note: s.note,
               })),
             });
           },
@@ -216,6 +218,7 @@ export function buildApp() {
               phase: m.phase,
               seats: m.seats.map((s) => ({
                 seatId: s.seatId,
+                agentId: s.agentId,
                 agentName: s.agentName,
                 strategy: s.strategy,
               })),

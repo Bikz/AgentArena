@@ -44,6 +44,7 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     seats: z.array(
       z.object({
         seatId: z.string().min(1),
+        agentId: z.string().min(1).optional(),
         agentName: z.string().min(1),
         strategy: z.enum(["hold", "random", "trend", "mean_revert"]),
       }),
@@ -59,9 +60,11 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
     rows: z.array(
       z.object({
         seatId: z.string().min(1),
+        agentId: z.string().min(1).optional(),
         agentName: z.string().min(1),
         credits: z.number(),
         target: z.number().min(-1).max(1),
+        note: z.string().optional(),
       }),
     ),
   }),

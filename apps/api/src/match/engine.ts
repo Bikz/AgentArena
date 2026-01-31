@@ -9,6 +9,7 @@ export type Seat = {
   strategy: Strategy;
   credits: number;
   target: number;
+  note?: string;
 };
 
 export type MatchPhase = "waiting" | "running" | "finished";
@@ -156,6 +157,7 @@ export class MatchEngine {
       phase: state.phase,
       seats: state.seats.map((s) => ({
         seatId: s.seatId,
+        agentId: s.agentId,
         agentName: s.agentName,
         strategy: s.strategy,
       })),
@@ -207,9 +209,11 @@ export class MatchEngine {
         tick: current.tick,
         rows: current.seats.map((s) => ({
           seatId: s.seatId,
+          agentId: s.agentId,
           agentName: s.agentName,
           credits: s.credits,
           target: s.target,
+          note: s.note,
         })),
       });
 
@@ -235,6 +239,7 @@ export class MatchEngine {
           phase: current.phase,
           seats: current.seats.map((s) => ({
             seatId: s.seatId,
+            agentId: s.agentId,
             agentName: s.agentName,
             strategy: s.strategy,
           })),
