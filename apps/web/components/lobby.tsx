@@ -78,6 +78,12 @@ export function Lobby() {
       | undefined;
   }, [events]);
 
+  const latestError = useMemo(() => {
+    return events.find((e) => e.type === "error") as
+      | Extract<ServerEvent, { type: "error" }>
+      | undefined;
+  }, [events]);
+
   const canJoin = state === "connected" && !!selectedAgent;
 
   return (
@@ -210,6 +216,15 @@ export function Lobby() {
             <div className="text-sm text-muted-foreground">No match yet.</div>
           )}
         </div>
+
+        {latestError ? (
+          <div className="md:col-span-3 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">
+            <div className="font-medium">{latestError.code}</div>
+            <div className="mt-1 text-destructive-foreground/80">
+              {latestError.message}
+            </div>
+          </div>
+        ) : null}
       </form>
     </section>
   );
