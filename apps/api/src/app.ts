@@ -56,6 +56,18 @@ export function buildApp() {
     return { agents: await listAgents(pool) };
   });
 
+  const AgentParams = z.object({ agentId: z.string().min(1) });
+  app.get(
+    "/agents/:agentId",
+    { schema: { params: AgentParams } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const agent = await getAgent(pool, req.params.agentId);
+      if (!agent) return reply.code(404).send({ error: "not_found" });
+      return { agent };
+    },
+  );
+
   const CreateAgentBody = z.object({
     name: z.string().min(1).max(64),
     prompt: z.string().min(1).max(10_000),
