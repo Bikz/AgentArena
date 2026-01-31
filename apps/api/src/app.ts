@@ -72,94 +72,104 @@ export function buildApp() {
     clientId: z.string().min(1).optional(),
   });
 
-  app.get(
-    "/ws",
-    {
-      schema: { querystring: WsQuery },
-      websocket: true,
-    },
-    (socket, req) => {
-      const clientId = req.query.clientId ?? "anon";
-      req.log.info({ clientId }, "ws connected");
+  app.register(async (instance) => {
+    instance.get(
+      "/ws",
+      {
+        schema: { querystring: WsQuery },
+        websocket: true,
+      },
+      (socket, req) => {
+        const queryClientId =
+          typeof (req as any).query?.clientId === "string"
+            ? ((req as any).query.clientId as string)
+            : undefined;
 
-      const client: WsClient = {
-        id: clientId,
-        send: (data: string) => socket.send(data),
-        close: () => socket.close(),
-      };
-      wsClients.set(clientId, client);
+        const rawUrl = req.raw.url ?? "/ws";
+        const base = `http://${req.headers.host ?? "localhost"}`;
+        const url = new URL(rawUrl, base);
+        const clientId = queryClientId ?? url.searchParams.get("clientId") ?? "anon";
+        req.log.info({ clientId }, "ws connected");
 
-      broadcastToAll({ type: "hello", v: 1, serverTime: Date.now() });
-      broadcastToAll({ type: "queue", v: 1, queueSize: engine.getQueueSize() });
+        const client: WsClient = {
+          id: clientId,
+          send: (data: string) => socket.send(data),
+          close: () => socket.close(),
+        };
+        wsClients.set(clientId, client);
 
-      const latestMatchId = engine.getLatestMatchId();
-      if (latestMatchId) {
-        const m = engine.getMatch(latestMatchId);
-        if (m) {
-          broadcastToAll({
-            type: "match_status",
-            v: 1,
-            matchId: m.config.matchId,
-            phase: m.phase,
-            seats: m.seats.map((s) => ({
-              seatId: s.seatId,
-              agentName: s.agentName,
-              strategy: s.strategy,
-            })),
-            tickIntervalMs: m.config.tickIntervalMs,
-            maxTicks: m.config.maxTicks,
-          });
+        broadcastToAll({ type: "hello", v: 1, serverTime: Date.now() });
+        broadcastToAll({ type: "queue", v: 1, queueSize: engine.getQueueSize() });
+
+        const latestMatchId = engine.getLatestMatchId();
+        if (latestMatchId) {
+          const m = engine.getMatch(latestMatchId);
+          if (m) {
+            broadcastToAll({
+              type: "match_status",
+              v: 1,
+              matchId: m.config.matchId,
+              phase: m.phase,
+              seats: m.seats.map((s) => ({
+                seatId: s.seatId,
+                agentName: s.agentName,
+                strategy: s.strategy,
+              })),
+              tickIntervalMs: m.config.tickIntervalMs,
+              maxTicks: m.config.maxTicks,
+            });
+          }
         }
-      }
 
-      socket.on("message", (_data: WsRawData) => {
-        try {
-          const json = JSON.parse(_data.toString());
-          const parsed = ClientEventSchema.safeParse(json);
-          if (!parsed.success) {
+        socket.on("message", (_data: WsRawData) => {
+          try {
+            const json = JSON.parse(_data.toString());
+            const parsed = ClientEventSchema.safeParse(json);
+            if (!parsed.success) {
+              socket.send(
+                JSON.stringify({
+                  type: "error",
+                  v: 1,
+                  code: "INVALID_MESSAGE",
+                  message: "Invalid client message.",
+                }),
+              );
+              return;
+            }
+
+            if (parsed.data.type === "subscribe") {
+              client.matchId = parsed.data.matchId;
+              return;
+            }
+
+            if (parsed.data.type === "join_queue") {
+              engine.joinQueue(parsed.data.agentName, parsed.data.strategy);
+              return;
+            }
+
+            if (parsed.data.type === "leave_queue") {
+              engine.leaveQueue();
+              return;
+            }
+          } catch {
             socket.send(
               JSON.stringify({
                 type: "error",
                 v: 1,
-                code: "INVALID_MESSAGE",
-                message: "Invalid client message.",
+                code: "INVALID_JSON",
+                message: "Invalid JSON message.",
               }),
             );
-            return;
           }
+        });
 
-          if (parsed.data.type === "subscribe") {
-            client.matchId = parsed.data.matchId;
-            return;
-          }
-
-          if (parsed.data.type === "join_queue") {
-            engine.joinQueue(parsed.data.agentName, parsed.data.strategy);
-            return;
-          }
-
-          if (parsed.data.type === "leave_queue") {
-            engine.leaveQueue();
-            return;
-          }
-        } catch {
-          socket.send(
-            JSON.stringify({
-              type: "error",
-              v: 1,
-              code: "INVALID_JSON",
-              message: "Invalid JSON message.",
-            }),
-          );
-        }
-      });
-
-      socket.on("close", () => {
-        req.log.info({ clientId }, "ws disconnected");
-        wsClients.delete(clientId);
-      });
-    },
-  );
+        socket.on("close", () => {
+          req.log.info({ clientId }, "ws disconnected");
+          wsClients.delete(clientId);
+        });
+      },
+    );
+  });
 
   app.setErrorHandler((err, req, reply) => {
     req.log.error({ err }, "request failed");
