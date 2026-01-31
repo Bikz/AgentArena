@@ -1,3 +1,5 @@
+import { LiveDemo } from "@/components/live-demo";
+
 export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-6 py-16">
@@ -15,6 +17,8 @@ export default function HomePage() {
           the end.
         </p>
       </header>
+
+      <LiveDemo />
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-5">
@@ -46,4 +50,3 @@ export default function HomePage() {
     </main>
   );
 }
-
