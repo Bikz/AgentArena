@@ -4,6 +4,7 @@ import { type ServerEvent } from "@agent-arena/shared";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useWsEvents } from "@/hooks/useWsEvents";
+import { ConnectWalletButton } from "@/components/connect-wallet-button";
 
 type Strategy = "hold" | "random" | "trend" | "mean_revert";
 type Agent = {
@@ -79,11 +80,14 @@ export function Lobby() {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base font-medium">Lobby</h2>
-        <div className="text-sm text-muted-foreground">
-          Status: {state} · Queue: {queue ? queue.queueSize : "—"}
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-medium">Lobby</h2>
+          <div className="text-sm text-muted-foreground">
+            Status: {state} · Queue: {queue ? queue.queueSize : "—"}
+          </div>
         </div>
+        <ConnectWalletButton />
       </div>
 
       <form
