@@ -23,3 +23,16 @@ describe("GET /agents (no db)", () => {
     if (prev) process.env.DATABASE_URL = prev;
   });
 });
+
+describe("GET /matches (no db)", () => {
+  it("returns 501 when DB is not configured", async () => {
+    const prev = process.env.DATABASE_URL;
+    delete process.env.DATABASE_URL;
+    const app = buildApp();
+    const res = await app.inject({ method: "GET", url: "/matches" });
+    expect(res.statusCode).toBe(501);
+    expect(res.json()).toEqual({ error: "db_not_configured" });
+    await app.close();
+    if (prev) process.env.DATABASE_URL = prev;
+  });
+});
