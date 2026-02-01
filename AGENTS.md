@@ -7,7 +7,8 @@
 4. Code as-built (code reality wins)
 
 ## Repo docs policy
-- All project notes live in `docs/` (gitignored).
+- `docs/` is **private working notes** and is **gitignored** (never committed).
+- Public-facing docs live at the repo root (e.g. `README.md`, `PRIZES.md`).
 - For this repo, gitignored files are still treated as normal developer context.
 
 ## Delivery process
