@@ -26,6 +26,10 @@ export default function HomePage() {
           <Link href="/agents/new" className="underline underline-offset-4">
             New agent
           </Link>
+          <span>·</span>
+          <Link href="/replay" className="underline underline-offset-4">
+            Replays
+          </Link>
         </div>
       </header>
 
