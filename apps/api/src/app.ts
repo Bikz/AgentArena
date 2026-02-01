@@ -19,6 +19,7 @@ import {
   getMatch,
   insertTick,
   listAgents,
+  listMatches,
   setAgentEns,
   upsertMatch,
   upsertSeat,
@@ -283,6 +284,20 @@ export function buildApp() {
       })),
     };
   });
+
+  const MatchesQuery = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  });
+  app.get(
+    "/matches",
+    { schema: { querystring: MatchesQuery } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const limit = req.query.limit ?? 25;
+      const matches = await listMatches(pool, { limit });
+      return { matches };
+    },
+  );
 
   const AgentParams = z.object({ agentId: z.string().min(1) });
   app.get(

@@ -16,6 +16,17 @@ export type AgentRow = {
   ens_claimed_at?: string | null;
 };
 
+export type MatchListRow = {
+  id: string;
+  created_at: string;
+  phase: string;
+  tick_interval_ms: number;
+  max_ticks: number;
+  start_price: string;
+  seat_count: number;
+  tick_count: number;
+};
+
 export function newId(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
@@ -109,6 +120,25 @@ export async function getMatch(pool: Pool, matchId: string) {
     seats: seatsRes.rows,
     ticks: ticksRes.rows,
   };
+}
+
+export async function listMatches(pool: Pool, { limit }: { limit: number }) {
+  const res = await pool.query<MatchListRow>(
+    `select
+        m.id,
+        m.created_at,
+        m.phase,
+        m.tick_interval_ms,
+        m.max_ticks,
+        m.start_price,
+        (select count(*)::int from match_seats s where s.match_id = m.id) as seat_count,
+        (select count(*)::int from match_ticks t where t.match_id = m.id) as tick_count
+      from matches m
+      order by m.created_at desc
+      limit $1`,
+    [limit],
+  );
+  return res.rows;
 }
 
 export async function upsertMatch(
