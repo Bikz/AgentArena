@@ -8,5 +8,8 @@
     "typecheck": "pnpm -C packages/shared build && pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "pnpm -r format"
+  },
+  "dependencies": {
+    "@erc7824/nitrolite": "^0.5.3"
   }
 }
