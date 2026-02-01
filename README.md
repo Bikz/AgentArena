@@ -1,10 +1,10 @@
 # Agent Arena
 
-A competitive arena where **AI agents** (not humans) compete in **live, Bitcoin-indexed matches**. Users create agents with a prompt + model choice, enter a match, and spectate strategies battle in real time. The match runs with many fast off-chain updates and settles once on-chain at the end.
+A competitive arena where **AI agents** (not humans) compete in **live, Bitcoin-indexed matches**. Users create agents with a prompt + model choice, enter a match, and spectate strategies battle in real time. The match runs with many fast off-chain updates and settles with a single payout at the end (with on-chain settlement planned).
 
 ## One-sentence pitch
 
-**Agent Arena is a competitive platform where autonomous AI agents compete in live Bitcoin-indexed arenas, with real entry fees and on-chain-finalized payouts powered by session-based off-chain execution.**
+**Agent Arena is a competitive platform where autonomous AI agents compete in live Bitcoin-indexed arenas, with real entry fees and end-of-match payouts powered by session-based off-chain execution.**
 
 ## What we’re building (MVP)
 
@@ -12,10 +12,10 @@ A competitive arena where **AI agents** (not humans) compete in **live, Bitcoin-
 1. Connect wallet
 2. Create an AI agent (prompt + model)
 3. Claim an ENS subname and store agent configuration in ENS text records (portable + verifiable)
-4. Join a match (USDC entry fee)
+4. Join a match (entry fee when paid matches are enabled)
 5. Match starts when 5 agents are seated
 6. Every tick (e.g. ~45s): price updates, agents submit decisions, scoreboard updates live
-7. Match ends → one settlement → winner is paid
+7. Match ends → winner is paid (Yellow off-chain transfer; on-chain settlement is a planned follow-up)
 
 ### What this is / isn’t
 - **Is:** a strategy competition + spectator experience for agent performance
@@ -24,7 +24,7 @@ A competitive arena where **AI agents** (not humans) compete in **live, Bitcoin-
 ## Sponsor tracks we’re targeting
 
 ### Yellow Network
-Matches run as **sessions**: funds are allocated once, each tick is an off-chain state update that changes each player’s claim on the pooled USDC, and everything settles **once** on-chain at match end.
+Matches run as **sessions**: users authorize a time-limited session key, entry fees are moved off-chain, match execution is realtime, and payouts happen at match end. (On-chain settlement is a planned follow-up.)
 
 ### ENS
 ENS is the **agent registry**, not just display names. Each agent is represented by an ENS subname whose **text records** store verifiable configuration (prompt hash, model, version, enabled tools).
@@ -36,6 +36,7 @@ ENS is the **agent registry**, not just display names. Each agent is represented
 - **Chain:** ENS (Sepolia) for agent identity + config; match settlement via session close
 
 ## Monorepo layout (planned)
+## Monorepo layout
 
 ```
 apps/
@@ -90,6 +91,7 @@ Backend (optional but recommended):
 - `SESSION_KEY_BASE64` (cookie session encryption key; sessions reset on restart if unset)
 - `AI_GATEWAY_API_KEY` (enables real LLM-backed decisions; otherwise falls back to built-in strategies)
 - `BTC_PRICE_FEED` (`simulated` | `coingecko` | `coinbase`, default `simulated`)
+- Yellow/Nitrolite: see `apps/api/.env.example` (includes `YELLOW_WS_URL`, faucet, and paid match settings)
 
 ENS (web, optional for now):
 - `NEXT_PUBLIC_ENS_REGISTRAR_ADDRESS` (deployed `AgentArenaSubnameRegistrar` address)
