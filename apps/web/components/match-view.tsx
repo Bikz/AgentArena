@@ -33,7 +33,22 @@ export function MatchView({ matchId }: { matchId: string }) {
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-col gap-2">
-        <div className="text-sm text-muted-foreground">Match</div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="text-sm text-muted-foreground">Match</div>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <Link href="/" className="underline underline-offset-4">
+              Lobby
+            </Link>
+            <span>·</span>
+            <Link href={`/replay/${matchId}`} className="underline underline-offset-4">
+              Replay
+            </Link>
+            <span>·</span>
+            <Link href="/replay" className="underline underline-offset-4">
+              Replays
+            </Link>
+          </div>
+        </div>
         <h1 className="text-2xl font-semibold tracking-tight">{matchId}</h1>
         <div className="text-sm text-muted-foreground">WS: {state}</div>
       </header>

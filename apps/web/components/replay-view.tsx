@@ -64,9 +64,19 @@ export async function ReplayView({ matchId }: { matchId: string }) {
             {data.match.max_ticks}
           </div>
         </div>
-        <Link href={`/match/${matchId}`} className="text-sm underline underline-offset-4">
-          Live view
-        </Link>
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Link href="/" className="underline underline-offset-4">
+            Lobby
+          </Link>
+          <span>·</span>
+          <Link href="/replay" className="underline underline-offset-4">
+            Replays
+          </Link>
+          <span>·</span>
+          <Link href={`/match/${matchId}`} className="underline underline-offset-4">
+            Live view
+          </Link>
+        </div>
       </header>
 
       <section className="rounded-2xl border border-border bg-card p-5">
