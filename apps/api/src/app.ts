@@ -111,7 +111,23 @@ export function buildApp() {
       : undefined,
   });
 
+  const paidMatches = process.env.YELLOW_PAID_MATCHES === "1";
+  const entryAsset = process.env.YELLOW_ENTRY_ASSET ?? "ytest.usd";
+  const entryAmount = BigInt(process.env.YELLOW_ENTRY_AMOUNT ?? "10000000");
+  const rakeBps = BigInt(process.env.YELLOW_RAKE_BPS ?? "2000");
+  const payoutBps = 10_000n - rakeBps;
+
+  const pendingEntryByClientId = new Map<
+    string,
+    { wallet: `0x${string}`; asset: string; amount: bigint; chargedAtMs: number }
+  >();
+
   app.get("/health", async () => ({ ok: true as const }));
+  app.get("/config", async () => ({
+    paidMatches,
+    entry: { asset: entryAsset, amount: entryAmount.toString() },
+    rakeBps: rakeBps.toString(),
+  }));
 
   app.get("/auth/me", async (req) => {
     const session = req.session as any;
@@ -403,17 +419,6 @@ export function buildApp() {
   };
 
   const btcFeed = createBtcUsdPriceFeed();
-
-  const paidMatches = process.env.YELLOW_PAID_MATCHES === "1";
-  const entryAsset = process.env.YELLOW_ENTRY_ASSET ?? "ytest.usd";
-  const entryAmount = BigInt(process.env.YELLOW_ENTRY_AMOUNT ?? "10000000");
-  const rakeBps = BigInt(process.env.YELLOW_RAKE_BPS ?? "2000");
-  const payoutBps = 10_000n - rakeBps;
-
-  const pendingEntryByClientId = new Map<
-    string,
-    { wallet: `0x${string}`; asset: string; amount: bigint; chargedAtMs: number }
-  >();
 
   const engine = new MatchEngine(
     (matchId, event) => broadcastToMatch(matchId, event),
@@ -811,6 +816,18 @@ export function buildApp() {
 
   app.addHook("onClose", async () => {
     wsClients.clear();
+    if (paidMatches && pendingEntryByClientId.size > 0) {
+      for (const pending of pendingEntryByClientId.values()) {
+        try {
+          await yellow.houseTransfer(pending.wallet as any, [
+            { asset: pending.asset, amount: pending.amount.toString() },
+          ]);
+        } catch (err) {
+          app.log.error({ err }, "failed to refund entry fee on shutdown");
+        }
+      }
+      pendingEntryByClientId.clear();
+    }
     yellow.close();
     engine.close();
     await pool?.end();
