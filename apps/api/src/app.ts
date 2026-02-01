@@ -27,6 +27,8 @@ import { decideSeatTarget } from "./agents/decide-seat.js";
 import { createBtcUsdPriceFeed } from "./prices/btc-usd.js";
 import crypto from "node:crypto";
 import { verifyMessage } from "viem";
+import { YellowService } from "./yellow/yellow.js";
+import { EIP712AuthTypes } from "@erc7824/nitrolite";
 
 type WsRawData = string | Buffer | ArrayBuffer | Buffer[];
 type WsClient = {
@@ -77,6 +79,18 @@ export function buildApp() {
   });
 
   const pool = createPool();
+  const yellow = new YellowService(app.log, {
+    wsUrl: process.env.YELLOW_WS_URL,
+    application: process.env.YELLOW_APPLICATION ?? "agent-arena",
+    scope: process.env.YELLOW_SCOPE ?? "public",
+    defaultAllowances: [
+      {
+        asset: process.env.YELLOW_ALLOWANCE_ASSET ?? "ytest.usd",
+        amount: process.env.YELLOW_ALLOWANCE_AMOUNT ?? "1000000000",
+      },
+    ],
+    expiresInSeconds: Number(process.env.YELLOW_EXPIRES_IN_SECONDS ?? "3600"),
+  });
 
   app.get("/health", async () => ({ ok: true as const }));
 
@@ -142,6 +156,79 @@ export function buildApp() {
 
   app.post("/auth/logout", async (req) => {
     (req.session as any).delete();
+    return { ok: true as const };
+  });
+
+  const YellowVerifyBody = z.object({
+    signature: z.string().min(1).max(512),
+  });
+
+  app.post("/yellow/auth/start", async (req, reply) => {
+    const address = (req.session as any).get("address") as string | undefined;
+    if (!address) return reply.code(401).send({ error: "unauthorized" as const });
+    const res = await yellow.startAuth(address as any);
+    return {
+      challenge: res.challenge,
+      typedData: {
+        domain: { name: res.application },
+        types: EIP712AuthTypes,
+        primaryType: "Policy" as const,
+        message: {
+          scope: res.scope,
+          session_key: res.sessionKey,
+          // Send as string for JSON; client converts to BigInt for signing.
+          expires_at: res.expiresAt,
+          allowances: res.allowances,
+          wallet: res.wallet,
+          challenge: res.challenge,
+        },
+      },
+    };
+  });
+
+  app.post(
+    "/yellow/auth/verify",
+    { schema: { body: YellowVerifyBody } },
+    async (req, reply) => {
+      const address = (req.session as any).get("address") as string | undefined;
+      if (!address) return reply.code(401).send({ error: "unauthorized" as const });
+      const signature = req.body.signature as `0x${string}`;
+      if (!signature.startsWith("0x"))
+        return reply.code(400).send({ error: "invalid_signature" as const });
+      const res = await yellow.verifyAuth(address as any, signature as any);
+      return res;
+    },
+  );
+
+  app.get("/yellow/me", async (req, reply) => {
+    const address = (req.session as any).get("address") as string | undefined;
+    if (!address) return reply.code(401).send({ error: "unauthorized" as const });
+    try {
+      const balances = await yellow.getLedgerBalances(address as any);
+      return { ok: true as const, balances };
+    } catch (err) {
+      return reply.code(400).send({
+        error: "yellow_not_ready" as const,
+        message: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  });
+
+  app.post("/yellow/faucet", async (req, reply) => {
+    const address = (req.session as any).get("address") as string | undefined;
+    if (!address) return reply.code(401).send({ error: "unauthorized" as const });
+    const url =
+      process.env.YELLOW_FAUCET_URL ??
+      "https://clearnet-sandbox.yellow.com/faucet/requestTokens";
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userAddress: address }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return reply.code(502).send({ error: "faucet_failed" as const, message: text });
+    }
     return { ok: true as const };
   });
 
@@ -556,6 +643,7 @@ export function buildApp() {
 
   app.addHook("onClose", async () => {
     wsClients.clear();
+    yellow.close();
     engine.close();
     await pool?.end();
   });
