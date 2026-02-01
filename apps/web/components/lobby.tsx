@@ -22,9 +22,67 @@ export function Lobby() {
     "loading" | "ready" | "error"
   >("loading");
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+  const [paidMatches, setPaidMatches] = useState<boolean>(false);
+  const [entry, setEntry] = useState<{ asset: string; amount: string } | null>(
+    null,
+  );
+  const [yellowReady, setYellowReady] = useState<boolean>(false);
 
   const { state, events, send } = useWsEvents();
   const auth = useAuth();
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const base =
+          process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
+        const res = await fetch(`${base}/config`, { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          paidMatches: boolean;
+          entry: { asset: string; amount: string };
+        };
+        if (cancelled) return;
+        setPaidMatches(Boolean(json.paidMatches));
+        setEntry(json.entry ?? null);
+      } catch {
+        // ignore
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!auth.isSignedIn) {
+        setYellowReady(false);
+        return;
+      }
+      try {
+        const base =
+          process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
+        const res = await fetch(`${base}/yellow/me`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (cancelled) return;
+        setYellowReady(res.ok);
+      } catch {
+        if (cancelled) return;
+        setYellowReady(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.isSignedIn]);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +144,11 @@ export function Lobby() {
       | undefined;
   }, [events]);
 
-  const canJoin = state === "connected" && !!selectedAgent && auth.isSignedIn;
+  const canJoin =
+    state === "connected" &&
+    !!selectedAgent &&
+    auth.isSignedIn &&
+    (!paidMatches || yellowReady);
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
@@ -96,6 +158,12 @@ export function Lobby() {
           <div className="text-sm text-muted-foreground">
             Status: {state} · Queue: {queue ? queue.queueSize : "—"}
           </div>
+          {paidMatches ? (
+            <div className="text-sm text-muted-foreground">
+              Paid matches enabled · Entry:{" "}
+              {entry ? `${entry.amount} ${entry.asset}` : "—"} (base units)
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-col items-start gap-2 md:items-end">
           <ConnectWalletButton />
@@ -197,7 +265,7 @@ export function Lobby() {
             disabled={!canJoin}
             className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
-            Join queue
+            {paidMatches && !yellowReady ? "Enable Yellow to join" : "Join queue"}
           </button>
 
           {match ? (

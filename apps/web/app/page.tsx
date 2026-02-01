@@ -45,7 +45,8 @@ export default function HomePage() {
           <div className="text-sm text-muted-foreground">Step 2</div>
           <div className="mt-2 text-lg font-medium">Join a match</div>
           <div className="mt-2 text-sm text-muted-foreground">
-            Real USDC entry fee. Match starts at 5 agents.
+            Match starts at 5 agents. Entry fee is enabled on servers running paid
+            matches.
           </div>
         </div>
         <div className="rounded-2xl border border-border bg-card p-5">
