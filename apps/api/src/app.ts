@@ -79,6 +79,12 @@ export function buildApp() {
   });
 
   const pool = createPool();
+  const housePrivateKey =
+    process.env.YELLOW_HOUSE_PRIVATE_KEY &&
+    process.env.YELLOW_HOUSE_PRIVATE_KEY.startsWith("0x")
+      ? (process.env.YELLOW_HOUSE_PRIVATE_KEY as `0x${string}`)
+      : undefined;
+
   const yellow = new YellowService(app.log, {
     wsUrl: process.env.YELLOW_WS_URL,
     application: process.env.YELLOW_APPLICATION ?? "agent-arena",
@@ -90,6 +96,19 @@ export function buildApp() {
       },
     ],
     expiresInSeconds: Number(process.env.YELLOW_EXPIRES_IN_SECONDS ?? "3600"),
+    housePrivateKey,
+    houseScope: process.env.YELLOW_HOUSE_SCOPE ?? "house",
+    houseAllowances: process.env.YELLOW_HOUSE_ALLOWANCE_ASSET
+      ? [
+          {
+            asset: process.env.YELLOW_HOUSE_ALLOWANCE_ASSET,
+            amount: process.env.YELLOW_HOUSE_ALLOWANCE_AMOUNT ?? "1000000000000",
+          },
+        ]
+      : undefined,
+    houseExpiresInSeconds: process.env.YELLOW_HOUSE_EXPIRES_IN_SECONDS
+      ? Number(process.env.YELLOW_HOUSE_EXPIRES_IN_SECONDS)
+      : undefined,
   });
 
   app.get("/health", async () => ({ ok: true as const }));
@@ -385,6 +404,17 @@ export function buildApp() {
 
   const btcFeed = createBtcUsdPriceFeed();
 
+  const paidMatches = process.env.YELLOW_PAID_MATCHES === "1";
+  const entryAsset = process.env.YELLOW_ENTRY_ASSET ?? "ytest.usd";
+  const entryAmount = BigInt(process.env.YELLOW_ENTRY_AMOUNT ?? "10000000");
+  const rakeBps = BigInt(process.env.YELLOW_RAKE_BPS ?? "2000");
+  const payoutBps = 10_000n - rakeBps;
+
+  const pendingEntryByClientId = new Map<
+    string,
+    { wallet: `0x${string}`; asset: string; amount: bigint; chargedAtMs: number }
+  >();
+
   const engine = new MatchEngine(
     (matchId, event) => broadcastToMatch(matchId, event),
     (event) => broadcastToAll(event),
@@ -433,6 +463,13 @@ export function buildApp() {
       ? {
           onError: (err) => app.log.error({ err }, "engine persistence error"),
           onMatchCreated: async (m) => {
+            // Once a match is created, any queued entry fees are considered "locked" for the match.
+            if (paidMatches) {
+              for (const seat of m.seats) {
+                if (!seat.clientId) continue;
+                pendingEntryByClientId.delete(seat.clientId);
+              }
+            }
             await upsertMatch(pool, {
               id: m.config.matchId,
               phase: m.phase,
@@ -481,6 +518,47 @@ export function buildApp() {
               maxTicks: m.config.maxTicks,
               startPrice: m.config.startPrice,
             });
+
+            if (!paidMatches) return;
+
+            if (!yellow.getHouseWallet()) {
+              app.log.error(
+                { matchId: m.config.matchId },
+                "paid matches enabled but YELLOW_HOUSE_PRIVATE_KEY not configured",
+              );
+              return;
+            }
+
+            const seatsWithOwners = m.seats.filter((s) => s.ownerAddress);
+            if (seatsWithOwners.length === 0) return;
+
+            const winner = seatsWithOwners.reduce((best, cur) =>
+              cur.credits > best.credits ? cur : best,
+            );
+
+            const pot = entryAmount * BigInt(seatsWithOwners.length);
+            const payout = (pot * payoutBps) / 10_000n;
+            if (payout <= 0n) return;
+
+            try {
+              await yellow.houseTransfer(winner.ownerAddress as any, [
+                { asset: entryAsset, amount: payout.toString() },
+              ]);
+              app.log.info(
+                {
+                  matchId: m.config.matchId,
+                  winner: winner.ownerAddress,
+                  payout: payout.toString(),
+                  asset: entryAsset,
+                },
+                "yellow payout sent",
+              );
+            } catch (err) {
+              app.log.error(
+                { err, matchId: m.config.matchId, winner: winner.ownerAddress },
+                "yellow payout failed",
+              );
+            }
           },
         }
       : undefined,
@@ -569,6 +647,73 @@ export function buildApp() {
                 return;
               }
 
+              if (paidMatches) {
+                if (engine.isQueued(client.id)) {
+                  socket.send(
+                    JSON.stringify({
+                      type: "error",
+                      v: 1,
+                      code: "ALREADY_QUEUED",
+                      message: "Already in queue.",
+                    }),
+                  );
+                  return;
+                }
+              }
+
+              const collectEntryFee = async () => {
+                if (!paidMatches) return true;
+                if (!yellow.sessions.getActive(client.address as any)) {
+                  socket.send(
+                    JSON.stringify({
+                      type: "error",
+                      v: 1,
+                      code: "YELLOW_NOT_READY",
+                      message: "Enable Yellow before joining a paid match.",
+                    }),
+                  );
+                  return false;
+                }
+                const house = yellow.getHouseWallet();
+                if (!house) {
+                  socket.send(
+                    JSON.stringify({
+                      type: "error",
+                      v: 1,
+                      code: "HOUSE_NOT_CONFIGURED",
+                      message: "Paid matches are not configured on this server.",
+                    }),
+                  );
+                  return false;
+                }
+                if (pendingEntryByClientId.has(client.id)) return true;
+                try {
+                  await yellow.transfer(client.address as any, house as any, [
+                    { asset: entryAsset, amount: entryAmount.toString() },
+                  ]);
+                  pendingEntryByClientId.set(client.id, {
+                    wallet: client.address as any,
+                    asset: entryAsset,
+                    amount: entryAmount,
+                    chargedAtMs: Date.now(),
+                  });
+                  return true;
+                } catch (err) {
+                  socket.send(
+                    JSON.stringify({
+                      type: "error",
+                      v: 1,
+                      code: "ENTRY_FEE_FAILED",
+                      message:
+                        err instanceof Error
+                          ? err.message
+                          : "Failed to collect entry fee.",
+                    }),
+                  );
+                  return false;
+                }
+              };
+
               if (pool && parsed.data.agentId) {
                 const agent = await getAgent(pool, parsed.data.agentId);
                 if (!agent) {
@@ -593,6 +738,7 @@ export function buildApp() {
                   );
                   return;
                 }
+                if (!(await collectEntryFee())) return;
                 engine.joinQueue({
                   clientId: client.id,
                   ownerAddress: client.address,
@@ -602,6 +748,7 @@ export function buildApp() {
                 });
                 return;
               }
+              if (!(await collectEntryFee())) return;
               engine.joinQueue({
                 clientId: client.id,
                 ownerAddress: client.address,
@@ -613,7 +760,18 @@ export function buildApp() {
             }
 
             if (parsed.data.type === "leave_queue") {
+              const pending = pendingEntryByClientId.get(client.id);
               engine.leaveQueue(client.id);
+              if (paidMatches && pending) {
+                pendingEntryByClientId.delete(client.id);
+                try {
+                  await yellow.houseTransfer(pending.wallet as any, [
+                    { asset: pending.asset, amount: pending.amount.toString() },
+                  ]);
+                } catch (err) {
+                  req.log.error({ err }, "failed to refund entry fee");
+                }
+              }
               return;
             }
           } catch {
@@ -631,6 +789,16 @@ export function buildApp() {
         socket.on("close", () => {
           req.log.info({ clientId }, "ws disconnected");
           wsClients.delete(clientId);
+          const pending = pendingEntryByClientId.get(clientId);
+          engine.leaveQueue(clientId);
+          if (paidMatches && pending) {
+            pendingEntryByClientId.delete(clientId);
+            void yellow
+              .houseTransfer(pending.wallet as any, [
+                { asset: pending.asset, amount: pending.amount.toString() },
+              ])
+              .catch((err) => req.log.error({ err }, "failed to refund entry fee"));
+          }
         });
       },
     );
