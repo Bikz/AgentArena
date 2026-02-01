@@ -9,6 +9,7 @@ export type PriceFeed = (input: {
 
 export type Seat = {
   seatId: string;
+  clientId?: string;
   agentId?: string;
   agentName: string;
   strategy: Strategy;
@@ -103,6 +104,10 @@ export class MatchEngine {
     return this.matchById.get(matchId);
   }
 
+  isQueued(clientId: string) {
+    return this.queue.some((q) => q.clientId === clientId);
+  }
+
   getLatestMatchId() {
     const matches = Array.from(this.matchById.values()).sort(
       (a, b) => b.createdAt - a.createdAt,
@@ -156,6 +161,7 @@ export class MatchEngine {
   ) {
     const seats: Seat[] = queued.map((q, idx) => ({
       seatId: String(idx + 1),
+      clientId: q.clientId,
       agentId: q.agentId,
       agentName: q.agentName,
       strategy: q.strategy,
