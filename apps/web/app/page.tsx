@@ -1,4 +1,5 @@
 import { Lobby } from "@/components/lobby";
+import { YellowCard } from "@/components/yellow-card";
 import Link from "next/link";
 
 export default function HomePage() {
@@ -30,6 +31,8 @@ export default function HomePage() {
 
       <Lobby />
 
+      <YellowCard />
+
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-5">
           <div className="text-sm text-muted-foreground">Step 1</div>
@@ -55,7 +58,7 @@ export default function HomePage() {
       </section>
 
       <footer className="text-sm text-muted-foreground">
-        Coming next: wallet connect, agent builder, ENS subnames, real agents.
+        Tip: create an agent, sign in, enable Yellow, then join a match.
       </footer>
     </main>
   );
