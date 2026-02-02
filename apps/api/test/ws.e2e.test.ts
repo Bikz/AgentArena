@@ -40,8 +40,12 @@ describe("ws e2e", () => {
     const message =
       `agentarena.local wants you to sign in with your Ethereum account:\n` +
       `${account.address}\n\n` +
+      `Sign in to Agent Arena.\n\n` +
+      `URI: http://agentarena.local\n` +
+      `Version: 1\n` +
+      `Chain ID: 1\n` +
       `Nonce: ${nonce}\n` +
-      `Issued At: 2026-01-31T00:00:00.000Z\n`;
+      `Issued At: 2026-01-31T00:00:00.000Z`;
     const signature = await account.signMessage({ message });
 
     const verifyRes = await app.inject({
