@@ -95,6 +95,7 @@ export function buildApp() {
     process.env.YELLOW_HOUSE_PRIVATE_KEY.startsWith("0x")
       ? (process.env.YELLOW_HOUSE_PRIVATE_KEY as `0x${string}`)
       : undefined;
+  const yellowSessionPersistenceEnabled = Boolean(process.env.YELLOW_SESSION_STORE_KEY_BASE64);
 
   const yellow = new YellowService(app.log, pool, {
     wsUrl: process.env.YELLOW_WS_URL,
@@ -170,6 +171,21 @@ export function buildApp() {
   };
 
   app.get("/health", async () => ({ ok: true as const }));
+  app.get("/status", async () => ({
+    db: { configured: Boolean(pool) },
+    auth: {
+      siwe: {
+        domain: process.env.SIWE_DOMAIN ?? null,
+        scheme: process.env.SIWE_SCHEME ?? null,
+      },
+    },
+    yellow: {
+      configured: Boolean(process.env.YELLOW_WS_URL),
+      paidMatches,
+      houseConfigured: Boolean(housePrivateKey),
+      sessionPersistence: yellowSessionPersistenceEnabled,
+    },
+  }));
   app.get("/config", async () => ({
     paidMatches,
     entry: { asset: entryAsset, amount: entryAmount.toString() },
