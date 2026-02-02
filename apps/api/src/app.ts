@@ -29,9 +29,9 @@ import {
 import { decideSeatTarget } from "./agents/decide-seat.js";
 import { createBtcUsdPriceFeed } from "./prices/btc-usd.js";
 import crypto from "node:crypto";
-import { verifyMessage } from "viem";
 import { YellowService } from "./yellow/yellow.js";
 import { EIP712AuthTypes } from "@erc7824/nitrolite";
+import { SiweMessage } from "siwe";
 
 type WsRawData = string | Buffer | ArrayBuffer | Buffer[];
 type WsClient = {
@@ -201,31 +201,32 @@ export function buildApp() {
         return reply.code(401).send({ error: "missing_nonce" as const });
 
       const message = req.body.message;
-
-      // Expected format:
-      // Line 1: "<domain> wants you to sign in with your Ethereum account:"
-      // Line 2: "<address>"
-      // ...
-      // "Nonce: <nonce>"
-      const lines = message.split("\n").map((l) => l.trim());
-      const addressLine = lines.find((_, i) => i === 1) ?? "";
-      const address = addressLine as `0x${string}`;
-      if (!address.startsWith("0x") || address.length < 10)
+      let siwe: SiweMessage;
+      try {
+        siwe = new SiweMessage(message);
+      } catch {
         return reply.code(400).send({ error: "invalid_message" as const });
+      }
 
-      const nonceLine = lines.find((l) => l.toLowerCase().startsWith("nonce:"));
-      const nonce = nonceLine?.split(":")[1]?.trim() ?? "";
-      if (!nonce || nonce !== expectedNonce)
-        return reply.code(401).send({ error: "nonce_mismatch" as const });
+      const domain = process.env.SIWE_DOMAIN;
+      const scheme = process.env.SIWE_SCHEME;
+      const res = await siwe
+        .verify(
+          {
+            signature: req.body.signature,
+            nonce: expectedNonce,
+            domain,
+            scheme,
+            time: new Date().toISOString(),
+          },
+          { suppressExceptions: true },
+        )
+        .catch(() => ({ success: false as const }));
 
-      const ok = await verifyMessage({
-        address,
-        message,
-        signature: req.body.signature as `0x${string}`,
-      }).catch(() => false);
+      if (!res.success)
+        return reply.code(401).send({ error: "invalid_signature" as const });
 
-      if (!ok) return reply.code(401).send({ error: "invalid_signature" as const });
-
+      const address = siwe.address as `0x${string}`;
       session.set("nonce", undefined);
       session.set("address", address);
       session.touch();
