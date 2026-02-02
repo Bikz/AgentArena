@@ -22,6 +22,8 @@ export function Lobby() {
     "loading" | "ready" | "error"
   >("loading");
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+  const [manualAgentName, setManualAgentName] = useState<string>("Guest");
+  const [manualStrategy, setManualStrategy] = useState<Strategy>("hold");
   const [paidMatches, setPaidMatches] = useState<boolean>(false);
   const [entry, setEntry] = useState<{ asset: string; amount: string } | null>(
     null,
@@ -167,6 +169,7 @@ export function Lobby() {
   const selectedAgent = useMemo(() => {
     return agents?.find((a) => a.id === selectedAgentId) ?? null;
   }, [agents, selectedAgentId]);
+  const hasManualAgent = manualAgentName.trim().length > 0;
 
   const queue = useMemo(() => {
     return events.find((e) => e.type === "queue") as
@@ -188,7 +191,7 @@ export function Lobby() {
 
   const canJoin =
     state === "connected" &&
-    !!selectedAgent &&
+    (!!selectedAgent || hasManualAgent) &&
     auth.isSignedIn &&
     (!paidMatches || yellowReady);
 
@@ -259,12 +262,22 @@ export function Lobby() {
         onSubmit={(e) => {
           e.preventDefault();
           if (!canJoin) return;
+          if (selectedAgent) {
+            send({
+              type: "join_queue",
+              v: 1,
+              agentId: selectedAgent.id,
+              agentName: selectedAgent.name,
+              strategy: selectedAgent.strategy,
+            });
+            return;
+          }
+          if (!hasManualAgent) return;
           send({
             type: "join_queue",
             v: 1,
-            agentId: selectedAgent.id,
-            agentName: selectedAgent.name,
-            strategy: selectedAgent.strategy,
+            agentName: manualAgentName.trim(),
+            strategy: manualStrategy,
           });
         }}
       >
@@ -320,8 +333,39 @@ export function Lobby() {
                     ))}
                   </select>
                 ) : (
-                  <div className="rounded-xl border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
-                    No agents yet.
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="text-sm text-muted-foreground" htmlFor="manual-agent">
+                        Agent name
+                      </label>
+                      <input
+                        id="manual-agent"
+                        value={manualAgentName}
+                        onChange={(e) => setManualAgentName(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+                        placeholder="Guest"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground" htmlFor="manual-strategy">
+                        Strategy
+                      </label>
+                      <select
+                        id="manual-strategy"
+                        value={manualStrategy}
+                        onChange={(e) => setManualStrategy(e.target.value as Strategy)}
+                        className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <option value="hold">hold</option>
+                        <option value="random">random</option>
+                        <option value="trend">trend</option>
+                        <option value="mean_revert">mean_revert</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2 text-xs text-muted-foreground">
+                      Quick-join works without a DB. Create a saved agent for ENS + prompt
+                      tracking.
+                    </div>
                   </div>
                 )}
               </div>
