@@ -43,6 +43,8 @@ type WsClient = {
   address?: string;
 };
 
+type WsAction = "subscribe" | "join_queue" | "leave_queue";
+
 export function buildApp() {
   const app = Fastify({
     logger: {
@@ -466,6 +468,25 @@ export function buildApp() {
   );
 
   const wsClients = new Map<string, WsClient>();
+  const wsActionBuckets = new Map<string, { windowStartMs: number; count: number }>();
+  const wsAllowAction = (clientId: string, action: WsAction) => {
+    const limits: Record<WsAction, { max: number; windowMs: number }> = {
+      subscribe: { max: 10, windowMs: 10_000 },
+      join_queue: { max: 5, windowMs: 10_000 },
+      leave_queue: { max: 10, windowMs: 10_000 },
+    };
+    const { max, windowMs } = limits[action];
+    const key = `${clientId}:${action}`;
+    const now = Date.now();
+    const bucket = wsActionBuckets.get(key);
+    if (!bucket || now - bucket.windowStartMs >= windowMs) {
+      wsActionBuckets.set(key, { windowStartMs: now, count: 1 });
+      return true;
+    }
+    if (bucket.count >= max) return false;
+    bucket.count += 1;
+    return true;
+  };
 
   const broadcastToAll = (event: unknown) => {
     const parsed = ServerEventSchema.safeParse(event);
@@ -833,11 +854,33 @@ export function buildApp() {
             }
 
             if (parsed.data.type === "subscribe") {
+              if (!wsAllowAction(client.id, "subscribe")) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    v: 1,
+                    code: "WS_RATE_LIMIT",
+                    message: "Too many requests. Slow down.",
+                  }),
+                );
+                return;
+              }
               client.matchId = parsed.data.matchId;
               return;
             }
 
             if (parsed.data.type === "join_queue") {
+              if (!wsAllowAction(client.id, "join_queue")) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    v: 1,
+                    code: "WS_RATE_LIMIT",
+                    message: "Too many join attempts. Slow down.",
+                  }),
+                );
+                return;
+              }
               if (!client.address) {
                 socket.send(
                   JSON.stringify({
@@ -976,6 +1019,17 @@ export function buildApp() {
             }
 
             if (parsed.data.type === "leave_queue") {
+              if (!wsAllowAction(client.id, "leave_queue")) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    v: 1,
+                    code: "WS_RATE_LIMIT",
+                    message: "Too many requests. Slow down.",
+                  }),
+                );
+                return;
+              }
               const pending = pendingEntryByClientId.get(client.id);
               engine.leaveQueue(client.id);
               if (paidMatches && pending) {
