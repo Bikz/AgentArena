@@ -19,7 +19,7 @@ type ReplayData = {
     id: number;
     created_at: string;
     match_id: string | null;
-    kind: "entry" | "refund" | "payout";
+    kind: "entry" | "refund" | "payout" | "tick_fees";
     asset: string;
     amount: string;
     from_wallet: string | null;

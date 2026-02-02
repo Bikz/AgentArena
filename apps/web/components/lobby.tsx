@@ -26,6 +26,9 @@ export function Lobby() {
   const [entry, setEntry] = useState<{ asset: string; amount: string } | null>(
     null,
   );
+  const [tickFee, setTickFee] = useState<{ asset: string; amount: string } | null>(
+    null,
+  );
   const [yellowReady, setYellowReady] = useState<boolean>(false);
 
   const { state, events, send } = useWsEvents();
@@ -42,10 +45,12 @@ export function Lobby() {
         const json = (await res.json()) as {
           paidMatches: boolean;
           entry: { asset: string; amount: string };
+          tickFee?: { asset: string; amount: string };
         };
         if (cancelled) return;
         setPaidMatches(Boolean(json.paidMatches));
         setEntry(json.entry ?? null);
+        setTickFee(json.tickFee ?? null);
       } catch {
         // ignore
       }
@@ -162,6 +167,11 @@ export function Lobby() {
             <div className="text-sm text-muted-foreground">
               Paid matches enabled · Entry:{" "}
               {entry ? `${entry.amount} ${entry.asset}` : "—"} (base units)
+            </div>
+          ) : null}
+          {paidMatches && tickFee && tickFee.amount !== "0" ? (
+            <div className="text-sm text-muted-foreground">
+              Tick fee (per seat per tick): {tickFee.amount} {tickFee.asset} (base units)
             </div>
           ) : null}
         </div>
