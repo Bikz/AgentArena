@@ -124,6 +124,34 @@ export function buildApp() {
     string,
     { wallet: `0x${string}`; asset: string; amount: bigint; chargedAtMs: number }
   >();
+  const queueRefundMs = Number(process.env.YELLOW_QUEUE_REFUND_MS ?? "600000"); // 10 minutes
+  let queueRefundInterval: ReturnType<typeof setInterval> | null = null;
+
+  const refundPendingEntry = async (input: {
+    clientId: string | null;
+    pending: { wallet: `0x${string}`; asset: string; amount: bigint };
+    log: { error: (obj: any, msg: string) => void };
+  }) => {
+    try {
+      const tx = await yellow.houseTransfer(input.pending.wallet as any, [
+        { asset: input.pending.asset, amount: input.pending.amount.toString() },
+      ]);
+      if (pool) {
+        await insertMatchPayment(pool, {
+          matchId: null,
+          kind: "refund",
+          asset: input.pending.asset,
+          amount: input.pending.amount.toString(),
+          fromWallet: yellow.getHouseWallet(),
+          toWallet: input.pending.wallet,
+          clientId: input.clientId,
+          tx,
+        });
+      }
+    } catch (err) {
+      input.log.error({ err }, "failed to refund entry fee");
+    }
+  };
 
   app.get("/health", async () => ({ ok: true as const }));
   app.get("/config", async () => ({
@@ -606,6 +634,32 @@ export function buildApp() {
       : undefined,
   );
 
+  if (paidMatches && queueRefundMs > 0) {
+    queueRefundInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [clientId, pending] of pendingEntryByClientId.entries()) {
+        if (now - pending.chargedAtMs < queueRefundMs) continue;
+
+        pendingEntryByClientId.delete(clientId);
+        engine.leaveQueue(clientId);
+
+        const client = wsClients.get(clientId);
+        if (client) {
+          client.send(
+            JSON.stringify({
+              type: "error",
+              v: 1,
+              code: "QUEUE_REFUND_TIMEOUT",
+              message: "Queue timed out; entry fee refunded.",
+            }),
+          );
+        }
+
+        void refundPendingEntry({ clientId, pending, log: app.log });
+      }
+    }, Math.min(queueRefundMs, 30_000));
+  }
+
   const WsQuery = z.object({
     clientId: z.string().min(1).optional(),
   });
@@ -819,25 +873,7 @@ export function buildApp() {
               engine.leaveQueue(client.id);
               if (paidMatches && pending) {
                 pendingEntryByClientId.delete(client.id);
-                try {
-                  const tx = await yellow.houseTransfer(pending.wallet as any, [
-                    { asset: pending.asset, amount: pending.amount.toString() },
-                  ]);
-                  if (pool) {
-                    await insertMatchPayment(pool, {
-                      matchId: null,
-                      kind: "refund",
-                      asset: pending.asset,
-                      amount: pending.amount.toString(),
-                      fromWallet: yellow.getHouseWallet(),
-                      toWallet: pending.wallet,
-                      clientId: client.id,
-                      tx,
-                    });
-                  }
-                } catch (err) {
-                  req.log.error({ err }, "failed to refund entry fee");
-                }
+                await refundPendingEntry({ clientId: client.id, pending, log: req.log });
               }
               return;
             }
@@ -860,24 +896,7 @@ export function buildApp() {
           engine.leaveQueue(clientId);
           if (paidMatches && pending) {
             pendingEntryByClientId.delete(clientId);
-            void yellow
-              .houseTransfer(pending.wallet as any, [
-                { asset: pending.asset, amount: pending.amount.toString() },
-              ])
-              .then(async (tx) => {
-                if (!pool) return;
-                await insertMatchPayment(pool, {
-                  matchId: null,
-                  kind: "refund",
-                  asset: pending.asset,
-                  amount: pending.amount.toString(),
-                  fromWallet: yellow.getHouseWallet(),
-                  toWallet: pending.wallet,
-                  clientId,
-                  tx,
-                });
-              })
-              .catch((err) => req.log.error({ err }, "failed to refund entry fee"));
+            void refundPendingEntry({ clientId, pending, log: req.log });
           }
         });
       },
@@ -891,27 +910,10 @@ export function buildApp() {
 
   app.addHook("onClose", async () => {
     wsClients.clear();
+    if (queueRefundInterval) clearInterval(queueRefundInterval);
     if (paidMatches && pendingEntryByClientId.size > 0) {
       for (const pending of pendingEntryByClientId.values()) {
-        try {
-          const tx = await yellow.houseTransfer(pending.wallet as any, [
-            { asset: pending.asset, amount: pending.amount.toString() },
-          ]);
-          if (pool) {
-            await insertMatchPayment(pool, {
-              matchId: null,
-              kind: "refund",
-              asset: pending.asset,
-              amount: pending.amount.toString(),
-              fromWallet: yellow.getHouseWallet(),
-              toWallet: pending.wallet,
-              clientId: null,
-              tx,
-            });
-          }
-        } catch (err) {
-          app.log.error({ err }, "failed to refund entry fee on shutdown");
-        }
+        await refundPendingEntry({ clientId: null, pending, log: app.log });
       }
       pendingEntryByClientId.clear();
     }
