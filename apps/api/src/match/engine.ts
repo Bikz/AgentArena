@@ -81,6 +81,12 @@ function clamp(n: number, min: number, max: number) {
 
 export class MatchEngine {
   private matchById = new Map<string, MatchState>();
+  private matchDefaults: Pick<MatchConfig, "tickIntervalMs" | "maxTicks" | "startPrice"> =
+    {
+      tickIntervalMs: 1500,
+      maxTicks: 40,
+      startPrice: 100_000,
+    };
   private queue: Array<
     Pick<Seat, "agentId" | "agentName" | "strategy" | "ownerAddress"> & {
       clientId: string;
@@ -115,6 +121,34 @@ export class MatchEngine {
     return matches[0]?.config.matchId;
   }
 
+  setMatchDefaults(input: Partial<typeof this.matchDefaults>) {
+    if (
+      typeof input.tickIntervalMs === "number" &&
+      Number.isFinite(input.tickIntervalMs) &&
+      input.tickIntervalMs >= 250
+    ) {
+      this.matchDefaults.tickIntervalMs = Math.floor(input.tickIntervalMs);
+    }
+    if (
+      typeof input.maxTicks === "number" &&
+      Number.isFinite(input.maxTicks) &&
+      input.maxTicks >= 1
+    ) {
+      this.matchDefaults.maxTicks = Math.floor(input.maxTicks);
+    }
+    if (
+      typeof input.startPrice === "number" &&
+      Number.isFinite(input.startPrice) &&
+      input.startPrice > 0
+    ) {
+      this.matchDefaults.startPrice = input.startPrice;
+    }
+  }
+
+  getMatchDefaults() {
+    return { ...this.matchDefaults };
+  }
+
   joinQueue(input: {
     clientId: string;
     ownerAddress?: string;
@@ -137,9 +171,9 @@ export class MatchEngine {
       const matchId = `match_${Date.now()}`;
       this.createAndStartMatch({
         matchId,
-        tickIntervalMs: 1500,
-        maxTicks: 40,
-        startPrice: 100_000,
+        tickIntervalMs: this.matchDefaults.tickIntervalMs,
+        maxTicks: this.matchDefaults.maxTicks,
+        startPrice: this.matchDefaults.startPrice,
       }, seats);
     }
   }

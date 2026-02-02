@@ -121,6 +121,10 @@ export function buildApp() {
   const payoutBps = 10_000n - rakeBps;
   const tickFeeAmount = BigInt(process.env.YELLOW_TICK_FEE_AMOUNT ?? "0");
 
+  const matchTickIntervalMs = Number(process.env.MATCH_TICK_INTERVAL_MS ?? "1500");
+  const matchMaxTicks = Number(process.env.MATCH_MAX_TICKS ?? "40");
+  const matchStartPrice = Number(process.env.MATCH_START_PRICE ?? "100000");
+
   const pendingEntryByClientId = new Map<
     string,
     { wallet: `0x${string}`; asset: string; amount: bigint; chargedAtMs: number }
@@ -162,6 +166,11 @@ export function buildApp() {
     entry: { asset: entryAsset, amount: entryAmount.toString() },
     rakeBps: rakeBps.toString(),
     tickFee: { asset: entryAsset, amount: tickFeeAmount.toString() },
+    match: {
+      tickIntervalMs: Math.max(250, Math.floor(matchTickIntervalMs)),
+      maxTicks: Math.max(1, Math.floor(matchMaxTicks)),
+      startPrice: matchStartPrice,
+    },
   }));
 
   app.get("/auth/me", async (req) => {
@@ -702,6 +711,12 @@ export function buildApp() {
     },
     engineHooks as any,
   );
+
+  engine.setMatchDefaults({
+    tickIntervalMs: matchTickIntervalMs,
+    maxTicks: matchMaxTicks,
+    startPrice: matchStartPrice,
+  });
 
   if (paidMatches && queueRefundMs > 0) {
     queueRefundInterval = setInterval(() => {
