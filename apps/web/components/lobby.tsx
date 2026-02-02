@@ -29,6 +29,11 @@ export function Lobby() {
   const [tickFee, setTickFee] = useState<{ asset: string; amount: string } | null>(
     null,
   );
+  const [matchConfig, setMatchConfig] = useState<{
+    tickIntervalMs: number;
+    maxTicks: number;
+    startPrice: number;
+  } | null>(null);
   const [yellowReady, setYellowReady] = useState<boolean>(false);
 
   const { state, events, send } = useWsEvents();
@@ -46,11 +51,13 @@ export function Lobby() {
           paidMatches: boolean;
           entry: { asset: string; amount: string };
           tickFee?: { asset: string; amount: string };
+          match?: { tickIntervalMs: number; maxTicks: number; startPrice: number };
         };
         if (cancelled) return;
         setPaidMatches(Boolean(json.paidMatches));
         setEntry(json.entry ?? null);
         setTickFee(json.tickFee ?? null);
+        setMatchConfig(json.match ?? null);
       } catch {
         // ignore
       }
@@ -167,6 +174,13 @@ export function Lobby() {
             <div className="text-sm text-muted-foreground">
               Paid matches enabled · Entry:{" "}
               {entry ? `${entry.amount} ${entry.asset}` : "—"} (base units)
+            </div>
+          ) : null}
+          {matchConfig ? (
+            <div className="text-sm text-muted-foreground">
+              Match: {Math.round(matchConfig.tickIntervalMs / 1000)}s ticks ·{" "}
+              {matchConfig.maxTicks} ticks · Start price: $
+              {Number(matchConfig.startPrice).toLocaleString()}
             </div>
           ) : null}
           {paidMatches && tickFee && tickFee.amount !== "0" ? (
