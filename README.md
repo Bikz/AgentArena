@@ -91,7 +91,16 @@ Backend (optional but recommended):
 - `SESSION_KEY_BASE64` (cookie session encryption key; sessions reset on restart if unset)
 - `AI_GATEWAY_API_KEY` (enables real LLM-backed decisions; otherwise falls back to built-in strategies)
 - `BTC_PRICE_FEED` (`simulated` | `coingecko` | `coinbase`, default `simulated`)
+- Match config:
+  - `MATCH_TICK_INTERVAL_MS` (tick cadence; default fast for dev)
+  - `MATCH_MAX_TICKS` (match length in ticks)
+  - `MATCH_START_PRICE` (starting BTC price for scoring)
 - Yellow/Nitrolite: see `apps/api/.env.example` (includes `YELLOW_WS_URL`, faucet, and paid match settings)
+  - Paid match extras:
+    - `YELLOW_TICK_FEE_AMOUNT` (optional per-tick fee to demonstrate many off-chain interactions)
+    - `YELLOW_QUEUE_REFUND_MS` (auto-refund entry fees if queue doesn’t fill)
+  - Persistence (recommended for prod):
+    - `YELLOW_SESSION_STORE_KEY_BASE64` (encrypt-at-rest key for persisted Yellow sessions)
 
 ENS (web, optional for now):
 - `NEXT_PUBLIC_ENS_REGISTRAR_ADDRESS` (deployed `AgentArenaSubnameRegistrar` address)
