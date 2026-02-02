@@ -27,6 +27,19 @@ export type MatchListRow = {
   tick_count: number;
 };
 
+export type MatchPaymentRow = {
+  id: number;
+  created_at: string;
+  match_id: string | null;
+  kind: "entry" | "refund" | "payout";
+  asset: string;
+  amount: string;
+  from_wallet: string | null;
+  to_wallet: string | null;
+  client_id: string | null;
+  tx: unknown | null;
+};
+
 export function newId(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
@@ -114,11 +127,16 @@ export async function getMatch(pool: Pool, matchId: string) {
     "select tick, ts, btc_price, leaderboard from match_ticks where match_id=$1 order by tick asc",
     [matchId],
   );
+  const paymentsRes = await pool.query<MatchPaymentRow>(
+    "select id, created_at, match_id, kind, asset, amount, from_wallet, to_wallet, client_id, tx from match_payments where match_id=$1 order by id asc",
+    [matchId],
+  );
 
   return {
     match,
     seats: seatsRes.rows,
     ticks: ticksRes.rows,
+    payments: paymentsRes.rows,
   };
 }
 
@@ -137,6 +155,64 @@ export async function listMatches(pool: Pool, { limit }: { limit: number }) {
       order by m.created_at desc
       limit $1`,
     [limit],
+  );
+  return res.rows;
+}
+
+export async function insertMatchPayment(
+  pool: Pool,
+  input: {
+    matchId: string | null;
+    kind: "entry" | "refund" | "payout";
+    asset: string;
+    amount: string;
+    fromWallet: string | null;
+    toWallet: string | null;
+    clientId: string | null;
+    tx: unknown | null;
+  },
+) {
+  const res = await pool.query<{ id: number }>(
+    `insert into match_payments (match_id, kind, asset, amount, from_wallet, to_wallet, client_id, tx)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)
+     returning id`,
+    [
+      input.matchId,
+      input.kind,
+      input.asset,
+      input.amount,
+      input.fromWallet,
+      input.toWallet,
+      input.clientId,
+      input.tx,
+    ],
+  );
+  return res.rows[0]!.id;
+}
+
+export async function attachLatestEntryPaymentToMatch(
+  pool: Pool,
+  input: { clientId: string; matchId: string },
+) {
+  await pool.query(
+    `update match_payments
+        set match_id = $1
+      where id = (
+        select id from match_payments
+         where match_id is null
+           and kind = 'entry'
+           and client_id = $2
+         order by id desc
+         limit 1
+      )`,
+    [input.matchId, input.clientId],
+  );
+}
+
+export async function listMatchPayments(pool: Pool, matchId: string) {
+  const res = await pool.query<MatchPaymentRow>(
+    "select id, created_at, match_id, kind, asset, amount, from_wallet, to_wallet, client_id, tx from match_payments where match_id=$1 order by id asc",
+    [matchId],
   );
   return res.rows;
 }

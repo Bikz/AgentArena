@@ -20,6 +20,8 @@ import {
   insertTick,
   listAgents,
   listMatches,
+  attachLatestEntryPaymentToMatch,
+  insertMatchPayment,
   setAgentEns,
   upsertMatch,
   upsertSeat,
@@ -488,6 +490,14 @@ export function buildApp() {
               for (const seat of m.seats) {
                 if (!seat.clientId) continue;
                 pendingEntryByClientId.delete(seat.clientId);
+                try {
+                  await attachLatestEntryPaymentToMatch(pool, {
+                    clientId: seat.clientId,
+                    matchId: m.config.matchId,
+                  });
+                } catch (err) {
+                  app.log.error({ err }, "failed to attach entry payment to match");
+                }
               }
             }
             await upsertMatch(pool, {
@@ -561,9 +571,21 @@ export function buildApp() {
             if (payout <= 0n) return;
 
             try {
-              await yellow.houseTransfer(winner.ownerAddress as any, [
+              const tx = await yellow.houseTransfer(winner.ownerAddress as any, [
                 { asset: entryAsset, amount: payout.toString() },
               ]);
+              if (pool) {
+                await insertMatchPayment(pool, {
+                  matchId: m.config.matchId,
+                  kind: "payout",
+                  asset: entryAsset,
+                  amount: payout.toString(),
+                  fromWallet: yellow.getHouseWallet(),
+                  toWallet: winner.ownerAddress ?? null,
+                  clientId: winner.clientId ?? null,
+                  tx,
+                });
+              }
               app.log.info(
                 {
                   matchId: m.config.matchId,
@@ -666,6 +688,7 @@ export function buildApp() {
                 );
                 return;
               }
+              const wallet = client.address;
 
               if (paidMatches) {
                 if (engine.isQueued(client.id)) {
@@ -683,7 +706,7 @@ export function buildApp() {
 
               const collectEntryFee = async () => {
                 if (!paidMatches) return true;
-                if (!yellow.sessions.getActive(client.address as any)) {
+                if (!yellow.sessions.getActive(wallet as any)) {
                   socket.send(
                     JSON.stringify({
                       type: "error",
@@ -708,11 +731,23 @@ export function buildApp() {
                 }
                 if (pendingEntryByClientId.has(client.id)) return true;
                 try {
-                  await yellow.transfer(client.address as any, house as any, [
+                  const tx = await yellow.transfer(wallet as any, house as any, [
                     { asset: entryAsset, amount: entryAmount.toString() },
                   ]);
+                  if (pool) {
+                    await insertMatchPayment(pool, {
+                      matchId: null,
+                      kind: "entry",
+                      asset: entryAsset,
+                      amount: entryAmount.toString(),
+                      fromWallet: wallet,
+                      toWallet: house,
+                      clientId: client.id,
+                      tx,
+                    });
+                  }
                   pendingEntryByClientId.set(client.id, {
-                    wallet: client.address as any,
+                    wallet: wallet as any,
                     asset: entryAsset,
                     amount: entryAmount,
                     chargedAtMs: Date.now(),
@@ -785,9 +820,21 @@ export function buildApp() {
               if (paidMatches && pending) {
                 pendingEntryByClientId.delete(client.id);
                 try {
-                  await yellow.houseTransfer(pending.wallet as any, [
+                  const tx = await yellow.houseTransfer(pending.wallet as any, [
                     { asset: pending.asset, amount: pending.amount.toString() },
                   ]);
+                  if (pool) {
+                    await insertMatchPayment(pool, {
+                      matchId: null,
+                      kind: "refund",
+                      asset: pending.asset,
+                      amount: pending.amount.toString(),
+                      fromWallet: yellow.getHouseWallet(),
+                      toWallet: pending.wallet,
+                      clientId: client.id,
+                      tx,
+                    });
+                  }
                 } catch (err) {
                   req.log.error({ err }, "failed to refund entry fee");
                 }
@@ -817,6 +864,19 @@ export function buildApp() {
               .houseTransfer(pending.wallet as any, [
                 { asset: pending.asset, amount: pending.amount.toString() },
               ])
+              .then(async (tx) => {
+                if (!pool) return;
+                await insertMatchPayment(pool, {
+                  matchId: null,
+                  kind: "refund",
+                  asset: pending.asset,
+                  amount: pending.amount.toString(),
+                  fromWallet: yellow.getHouseWallet(),
+                  toWallet: pending.wallet,
+                  clientId,
+                  tx,
+                });
+              })
               .catch((err) => req.log.error({ err }, "failed to refund entry fee"));
           }
         });
@@ -834,9 +894,21 @@ export function buildApp() {
     if (paidMatches && pendingEntryByClientId.size > 0) {
       for (const pending of pendingEntryByClientId.values()) {
         try {
-          await yellow.houseTransfer(pending.wallet as any, [
+          const tx = await yellow.houseTransfer(pending.wallet as any, [
             { asset: pending.asset, amount: pending.amount.toString() },
           ]);
+          if (pool) {
+            await insertMatchPayment(pool, {
+              matchId: null,
+              kind: "refund",
+              asset: pending.asset,
+              amount: pending.amount.toString(),
+              fromWallet: yellow.getHouseWallet(),
+              toWallet: pending.wallet,
+              clientId: null,
+              tx,
+            });
+          }
         } catch (err) {
           app.log.error({ err }, "failed to refund entry fee on shutdown");
         }
