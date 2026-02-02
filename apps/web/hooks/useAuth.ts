@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, useSignMessage } from "wagmi";
+import { useAccount, useChainId, useSignMessage } from "wagmi";
 
 type AuthState = "idle" | "loading" | "signing" | "error";
 
@@ -11,6 +11,7 @@ function apiBase() {
 
 export function useAuth() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const { signMessageAsync } = useSignMessage();
 
   const [state, setState] = useState<AuthState>("loading");
@@ -57,13 +58,18 @@ export function useAuth() {
       const { nonce } = (await nonceRes.json()) as { nonce: string };
 
       const domain = window.location.host;
+      const uri = window.location.origin;
       const issuedAt = new Date().toISOString();
 
       const message =
         `${domain} wants you to sign in with your Ethereum account:\n` +
         `${address}\n\n` +
+        `Sign in to Agent Arena.\n\n` +
+        `URI: ${uri}\n` +
+        `Version: 1\n` +
+        `Chain ID: ${chainId}\n` +
         `Nonce: ${nonce}\n` +
-        `Issued At: ${issuedAt}\n`;
+        `Issued At: ${issuedAt}`;
 
       const signature = await signMessageAsync({ message });
 
@@ -81,7 +87,7 @@ export function useAuth() {
       setState("error");
       setError(err instanceof Error ? err.message : "Unknown error");
     }
-  }, [address, isConnected, refresh, signMessageAsync]);
+  }, [address, chainId, isConnected, refresh, signMessageAsync]);
 
   const signOut = useCallback(async () => {
     setState("loading");
@@ -106,4 +112,3 @@ export function useAuth() {
     signOut,
   };
 }
-
