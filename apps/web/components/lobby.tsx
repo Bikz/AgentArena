@@ -34,6 +34,15 @@ export function Lobby() {
     maxTicks: number;
     startPrice: number;
   } | null>(null);
+  const [status, setStatus] = useState<{
+    db: { configured: boolean };
+    yellow: {
+      configured: boolean;
+      paidMatches: boolean;
+      houseConfigured: boolean;
+      sessionPersistence: boolean;
+    };
+  } | null>(null);
   const [yellowReady, setYellowReady] = useState<boolean>(false);
 
   const { state, events, send } = useWsEvents();
@@ -58,6 +67,27 @@ export function Lobby() {
         setEntry(json.entry ?? null);
         setTickFee(json.tickFee ?? null);
         setMatchConfig(json.match ?? null);
+      } catch {
+        // ignore
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const base =
+          process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
+        const res = await fetch(`${base}/status`, { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as any;
+        if (cancelled) return;
+        setStatus(json ?? null);
       } catch {
         // ignore
       }
@@ -238,6 +268,28 @@ export function Lobby() {
           });
         }}
       >
+        {status ? (
+          <div className="md:col-span-3 rounded-xl border border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>
+                DB: {status.db.configured ? "on" : "off"} · Yellow:{" "}
+                {status.yellow.configured ? "on" : "off"}
+              </span>
+              {status.yellow.paidMatches && !status.yellow.houseConfigured ? (
+                <span className="text-destructive-foreground/80">
+                  Paid matches misconfigured: missing house wallet.
+                </span>
+              ) : null}
+              {status.yellow.paidMatches && !status.yellow.sessionPersistence ? (
+                <span>
+                  Tip: set <span className="font-mono">YELLOW_SESSION_STORE_KEY_BASE64</span>{" "}
+                  to survive restarts.
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         <div className="md:col-span-3">
           <div className="flex items-end justify-between gap-4">
             <div className="min-w-0 flex-1">
