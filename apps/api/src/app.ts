@@ -3,6 +3,7 @@ import helmet from "@fastify/helmet";
 import websocket from "@fastify/websocket";
 import cookie from "@fastify/cookie";
 import secureSession from "@fastify/secure-session";
+import rateLimit from "@fastify/rate-limit";
 import { ClientEventSchema, ServerEventSchema } from "@agent-arena/shared";
 import Fastify from "fastify";
 import {
@@ -60,6 +61,11 @@ export function buildApp() {
   app.register(cors, { origin: true, credentials: true });
   app.register(websocket);
   app.register(cookie);
+  app.register(rateLimit, {
+    global: true,
+    max: process.env.NODE_ENV === "test" ? 100_000 : 600,
+    timeWindow: "1 minute",
+  });
   app.register(secureSession as unknown as Parameters<typeof app.register>[0], {
     cookieName: "agentarena_session",
     key: (() => {
@@ -179,13 +185,22 @@ export function buildApp() {
     return { address: address ?? null };
   });
 
-  app.post("/auth/nonce", async (req) => {
-    const session = req.session as any;
-    const nonce = crypto.randomBytes(16).toString("hex");
-    session.set("nonce", nonce);
-    session.touch();
-    return { nonce };
-  });
+  const authRateLimit =
+    process.env.NODE_ENV === "test"
+      ? { max: 100_000, timeWindow: "1 minute" }
+      : { max: 30, timeWindow: "5 minutes" };
+
+  app.post(
+    "/auth/nonce",
+    { config: { rateLimit: authRateLimit } },
+    async (req) => {
+      const session = req.session as any;
+      const nonce = crypto.randomBytes(16).toString("hex");
+      session.set("nonce", nonce);
+      session.touch();
+      return { nonce };
+    },
+  );
 
   const VerifyBody = z.object({
     message: z.string().min(1).max(2000),
@@ -193,7 +208,7 @@ export function buildApp() {
   });
   app.post(
     "/auth/verify",
-    { schema: { body: VerifyBody } },
+    { schema: { body: VerifyBody }, config: { rateLimit: authRateLimit } },
     async (req, reply) => {
       const session = req.session as any;
       const expectedNonce = session.get("nonce") as string | undefined;
@@ -243,7 +258,7 @@ export function buildApp() {
     signature: z.string().min(1).max(512),
   });
 
-  app.post("/yellow/auth/start", async (req, reply) => {
+  app.post("/yellow/auth/start", { config: { rateLimit: authRateLimit } }, async (req, reply) => {
     const address = (req.session as any).get("address") as string | undefined;
     if (!address) return reply.code(401).send({ error: "unauthorized" as const });
     const res = await yellow.startAuth(address as any);
@@ -268,7 +283,7 @@ export function buildApp() {
 
   app.post(
     "/yellow/auth/verify",
-    { schema: { body: YellowVerifyBody } },
+    { schema: { body: YellowVerifyBody }, config: { rateLimit: authRateLimit } },
     async (req, reply) => {
       const address = (req.session as any).get("address") as string | undefined;
       if (!address) return reply.code(401).send({ error: "unauthorized" as const });
