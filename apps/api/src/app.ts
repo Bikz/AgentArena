@@ -119,11 +119,14 @@ export function buildApp() {
   const entryAmount = BigInt(process.env.YELLOW_ENTRY_AMOUNT ?? "10000000");
   const rakeBps = BigInt(process.env.YELLOW_RAKE_BPS ?? "2000");
   const payoutBps = 10_000n - rakeBps;
+  const tickFeeAmount = BigInt(process.env.YELLOW_TICK_FEE_AMOUNT ?? "0");
 
   const pendingEntryByClientId = new Map<
     string,
     { wallet: `0x${string}`; asset: string; amount: bigint; chargedAtMs: number }
   >();
+  const tickFeeTotalsByMatchId = new Map<string, { count: number; total: bigint }>();
+  const tickFeeChainByMatchId = new Map<string, Promise<void>>();
   const queueRefundMs = Number(process.env.YELLOW_QUEUE_REFUND_MS ?? "600000"); // 10 minutes
   let queueRefundInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -158,6 +161,7 @@ export function buildApp() {
     paidMatches,
     entry: { asset: entryAsset, amount: entryAmount.toString() },
     rakeBps: rakeBps.toString(),
+    tickFee: { asset: entryAsset, amount: tickFeeAmount.toString() },
   }));
 
   app.get("/auth/me", async (req) => {
@@ -465,6 +469,193 @@ export function buildApp() {
 
   const btcFeed = createBtcUsdPriceFeed();
 
+  const engineHooks = {
+    onError: (err: unknown) => app.log.error({ err }, "engine hook error"),
+    onMatchCreated: async (m: any) => {
+      // Once a match is created, any queued entry fees are considered "locked" for the match.
+      if (paidMatches) {
+        for (const seat of m.seats as Array<{ clientId?: string }>) {
+          if (!seat.clientId) continue;
+          pendingEntryByClientId.delete(seat.clientId);
+          if (pool) {
+            try {
+              await attachLatestEntryPaymentToMatch(pool, {
+                clientId: seat.clientId,
+                matchId: m.config.matchId,
+              });
+            } catch (err) {
+              app.log.error({ err }, "failed to attach entry payment to match");
+            }
+          }
+        }
+      }
+
+      if (!pool) return;
+      await upsertMatch(pool, {
+        id: m.config.matchId,
+        phase: m.phase,
+        tickIntervalMs: m.config.tickIntervalMs,
+        maxTicks: m.config.maxTicks,
+        startPrice: m.config.startPrice,
+      });
+      for (const seat of m.seats as any[]) {
+        await upsertSeat(pool, {
+          matchId: m.config.matchId,
+          seatId: seat.seatId,
+          agentId: seat.agentId ?? null,
+          agentName: seat.agentName,
+          strategy: seat.strategy,
+        });
+      }
+    },
+    onTick: async (m: any) => {
+      if (pool) {
+        await upsertMatch(pool, {
+          id: m.config.matchId,
+          phase: m.phase,
+          tickIntervalMs: m.config.tickIntervalMs,
+          maxTicks: m.config.maxTicks,
+          startPrice: m.config.startPrice,
+        });
+        await insertTick(pool, {
+          matchId: m.config.matchId,
+          tick: m.tick,
+          ts: new Date(),
+          btcPrice: m.price,
+          leaderboard: m.seats.map((s: any) => ({
+            seatId: s.seatId,
+            agentId: s.agentId,
+            agentName: s.agentName,
+            credits: s.credits,
+            target: s.target,
+            note: s.note,
+          })),
+        });
+      }
+
+      if (
+        paidMatches &&
+        tickFeeAmount > 0n &&
+        m.phase === "running" &&
+        yellow.getHouseWallet()
+      ) {
+        const matchId = m.config.matchId;
+        const prev = tickFeeChainByMatchId.get(matchId) ?? Promise.resolve();
+        const next = prev
+          .then(async () => {
+            const house = yellow.getHouseWallet();
+            if (!house) return;
+            for (const seat of m.seats as any[]) {
+              if (!seat.ownerAddress) continue;
+              try {
+                await yellow.transfer(seat.ownerAddress as any, house as any, [
+                  { asset: entryAsset, amount: tickFeeAmount.toString() },
+                ]);
+                const totals = tickFeeTotalsByMatchId.get(matchId) ?? {
+                  count: 0,
+                  total: 0n,
+                };
+                totals.count += 1;
+                totals.total += tickFeeAmount;
+                tickFeeTotalsByMatchId.set(matchId, totals);
+              } catch (err) {
+                app.log.warn(
+                  { err, matchId, wallet: seat.ownerAddress },
+                  "failed to collect tick fee",
+                );
+              }
+            }
+          })
+          .catch((err) =>
+            app.log.error({ err, matchId }, "tick fee collection failed"),
+          );
+        tickFeeChainByMatchId.set(matchId, next);
+      }
+    },
+    onFinished: async (m: any) => {
+      if (pool) {
+        await upsertMatch(pool, {
+          id: m.config.matchId,
+          phase: m.phase,
+          tickIntervalMs: m.config.tickIntervalMs,
+          maxTicks: m.config.maxTicks,
+          startPrice: m.config.startPrice,
+        });
+      }
+
+      if (!paidMatches) return;
+
+      if (tickFeeAmount > 0n) {
+        const totals = tickFeeTotalsByMatchId.get(m.config.matchId);
+        if (totals && totals.total > 0n && pool) {
+          await insertMatchPayment(pool, {
+            matchId: m.config.matchId,
+            kind: "tick_fees",
+            asset: entryAsset,
+            amount: totals.total.toString(),
+            fromWallet: null,
+            toWallet: yellow.getHouseWallet(),
+            clientId: null,
+            tx: { count: totals.count, amountPerTick: tickFeeAmount.toString() },
+          });
+        }
+        tickFeeTotalsByMatchId.delete(m.config.matchId);
+        tickFeeChainByMatchId.delete(m.config.matchId);
+      }
+
+      if (!yellow.getHouseWallet()) {
+        app.log.error(
+          { matchId: m.config.matchId },
+          "paid matches enabled but YELLOW_HOUSE_PRIVATE_KEY not configured",
+        );
+        return;
+      }
+
+      const seatsWithOwners = (m.seats as any[]).filter((s) => s.ownerAddress);
+      if (seatsWithOwners.length === 0) return;
+
+      const winner = seatsWithOwners.reduce((best, cur) =>
+        cur.credits > best.credits ? cur : best,
+      );
+
+      const pot = entryAmount * BigInt(seatsWithOwners.length);
+      const payout = (pot * payoutBps) / 10_000n;
+      if (payout <= 0n) return;
+
+      try {
+        const tx = await yellow.houseTransfer(winner.ownerAddress as any, [
+          { asset: entryAsset, amount: payout.toString() },
+        ]);
+        if (pool) {
+          await insertMatchPayment(pool, {
+            matchId: m.config.matchId,
+            kind: "payout",
+            asset: entryAsset,
+            amount: payout.toString(),
+            fromWallet: yellow.getHouseWallet(),
+            toWallet: winner.ownerAddress ?? null,
+            clientId: winner.clientId ?? null,
+            tx,
+          });
+        }
+        app.log.info(
+          {
+            matchId: m.config.matchId,
+            winner: winner.ownerAddress,
+            payout: payout.toString(),
+            asset: entryAsset,
+          },
+          "yellow payout sent",
+        );
+      } catch (err) {
+        app.log.error(
+          { err, matchId: m.config.matchId, winner: winner.ownerAddress },
+          "yellow payout failed",
+        );
+      }
+    },
+  };
+
   const engine = new MatchEngine(
     (matchId, event) => broadcastToMatch(matchId, event),
     (event) => broadcastToAll(event),
@@ -509,129 +700,7 @@ export function buildApp() {
       });
       return { price: res.priceUsd, source: res.source };
     },
-    pool
-      ? {
-          onError: (err) => app.log.error({ err }, "engine persistence error"),
-          onMatchCreated: async (m) => {
-            // Once a match is created, any queued entry fees are considered "locked" for the match.
-            if (paidMatches) {
-              for (const seat of m.seats) {
-                if (!seat.clientId) continue;
-                pendingEntryByClientId.delete(seat.clientId);
-                try {
-                  await attachLatestEntryPaymentToMatch(pool, {
-                    clientId: seat.clientId,
-                    matchId: m.config.matchId,
-                  });
-                } catch (err) {
-                  app.log.error({ err }, "failed to attach entry payment to match");
-                }
-              }
-            }
-            await upsertMatch(pool, {
-              id: m.config.matchId,
-              phase: m.phase,
-              tickIntervalMs: m.config.tickIntervalMs,
-              maxTicks: m.config.maxTicks,
-              startPrice: m.config.startPrice,
-            });
-            for (const seat of m.seats) {
-              await upsertSeat(pool, {
-                matchId: m.config.matchId,
-                seatId: seat.seatId,
-                agentId: seat.agentId ?? null,
-                agentName: seat.agentName,
-                strategy: seat.strategy,
-              });
-            }
-          },
-          onTick: async (m) => {
-            await upsertMatch(pool, {
-              id: m.config.matchId,
-              phase: m.phase,
-              tickIntervalMs: m.config.tickIntervalMs,
-              maxTicks: m.config.maxTicks,
-              startPrice: m.config.startPrice,
-            });
-            await insertTick(pool, {
-              matchId: m.config.matchId,
-              tick: m.tick,
-              ts: new Date(),
-              btcPrice: m.price,
-              leaderboard: m.seats.map((s) => ({
-                seatId: s.seatId,
-                agentId: s.agentId,
-                agentName: s.agentName,
-                credits: s.credits,
-                target: s.target,
-                note: s.note,
-              })),
-            });
-          },
-          onFinished: async (m) => {
-            await upsertMatch(pool, {
-              id: m.config.matchId,
-              phase: m.phase,
-              tickIntervalMs: m.config.tickIntervalMs,
-              maxTicks: m.config.maxTicks,
-              startPrice: m.config.startPrice,
-            });
-
-            if (!paidMatches) return;
-
-            if (!yellow.getHouseWallet()) {
-              app.log.error(
-                { matchId: m.config.matchId },
-                "paid matches enabled but YELLOW_HOUSE_PRIVATE_KEY not configured",
-              );
-              return;
-            }
-
-            const seatsWithOwners = m.seats.filter((s) => s.ownerAddress);
-            if (seatsWithOwners.length === 0) return;
-
-            const winner = seatsWithOwners.reduce((best, cur) =>
-              cur.credits > best.credits ? cur : best,
-            );
-
-            const pot = entryAmount * BigInt(seatsWithOwners.length);
-            const payout = (pot * payoutBps) / 10_000n;
-            if (payout <= 0n) return;
-
-            try {
-              const tx = await yellow.houseTransfer(winner.ownerAddress as any, [
-                { asset: entryAsset, amount: payout.toString() },
-              ]);
-              if (pool) {
-                await insertMatchPayment(pool, {
-                  matchId: m.config.matchId,
-                  kind: "payout",
-                  asset: entryAsset,
-                  amount: payout.toString(),
-                  fromWallet: yellow.getHouseWallet(),
-                  toWallet: winner.ownerAddress ?? null,
-                  clientId: winner.clientId ?? null,
-                  tx,
-                });
-              }
-              app.log.info(
-                {
-                  matchId: m.config.matchId,
-                  winner: winner.ownerAddress,
-                  payout: payout.toString(),
-                  asset: entryAsset,
-                },
-                "yellow payout sent",
-              );
-            } catch (err) {
-              app.log.error(
-                { err, matchId: m.config.matchId, winner: winner.ownerAddress },
-                "yellow payout failed",
-              );
-            }
-          },
-        }
-      : undefined,
+    engineHooks as any,
   );
 
   if (paidMatches && queueRefundMs > 0) {
