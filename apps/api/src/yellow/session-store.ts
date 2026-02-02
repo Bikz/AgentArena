@@ -67,8 +67,11 @@ export class YellowSessionStore {
     return s;
   }
 
+  listActive() {
+    return Array.from(this.activeByWallet.values());
+  }
+
   clearActive(wallet: Address) {
     this.activeByWallet.delete(this.key(wallet));
   }
 }
-

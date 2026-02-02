@@ -94,7 +94,7 @@ export function buildApp() {
       ? (process.env.YELLOW_HOUSE_PRIVATE_KEY as `0x${string}`)
       : undefined;
 
-  const yellow = new YellowService(app.log, {
+  const yellow = new YellowService(app.log, pool, {
     wsUrl: process.env.YELLOW_WS_URL,
     application: process.env.YELLOW_APPLICATION ?? "agent-arena",
     scope: process.env.YELLOW_SCOPE ?? "public",
@@ -119,6 +119,7 @@ export function buildApp() {
       ? Number(process.env.YELLOW_HOUSE_EXPIRES_IN_SECONDS)
       : undefined,
   });
+  void yellow.hydrateFromDb(app.log);
 
   const paidMatches = process.env.YELLOW_PAID_MATCHES === "1";
   const entryAsset = process.env.YELLOW_ENTRY_ASSET ?? "ytest.usd";
@@ -250,6 +251,12 @@ export function buildApp() {
   );
 
   app.post("/auth/logout", async (req) => {
+    const address = (req.session as any).get("address") as string | undefined;
+    if (address) {
+      await yellow.clearActive(address as any).catch(() => {
+        // best effort
+      });
+    }
     (req.session as any).delete();
     return { ok: true as const };
   });

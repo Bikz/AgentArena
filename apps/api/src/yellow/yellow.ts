@@ -18,6 +18,14 @@ import type { Address, Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { ClearnodeWs } from "./clearnode.js";
 import { YellowSessionStore } from "./session-store.js";
+import { decryptJson, encryptJson, readKeyBase64 } from "./crypto.js";
+import type { Pool } from "pg";
+import {
+  deleteExpiredYellowSessions,
+  deleteYellowSession,
+  listActiveYellowSessions,
+  upsertYellowSession,
+} from "../db/yellow-sessions.js";
 
 const DEFAULT_WS_URL = "wss://clearnet-sandbox.yellow.com/ws";
 
@@ -27,6 +35,8 @@ function randomHex(bytes: number): Hex {
 
 export class YellowService {
   readonly sessions = new YellowSessionStore();
+  private readonly pool: Pool | null;
+  private readonly storeKey: Buffer | null;
 
   private readonly ws: ClearnodeWs;
   private house:
@@ -47,6 +57,7 @@ export class YellowService {
       warn: (obj: Record<string, unknown>, msg: string) => void;
       error: (obj: Record<string, unknown>, msg: string) => void;
     },
+    pool: Pool | null,
     private readonly config: {
       wsUrl?: string;
       application: string;
@@ -60,6 +71,8 @@ export class YellowService {
     },
   ) {
     this.ws = new ClearnodeWs(config.wsUrl ?? DEFAULT_WS_URL, log);
+    this.pool = pool;
+    this.storeKey = readKeyBase64("YELLOW_SESSION_STORE_KEY_BASE64");
     if (config.housePrivateKey) {
       const houseAccount = privateKeyToAccount(config.housePrivateKey);
       this.house = {
@@ -71,6 +84,47 @@ export class YellowService {
         expiresAt: 0n,
         allowances: config.houseAllowances ?? config.defaultAllowances,
       };
+    }
+  }
+
+  async hydrateFromDb(log: { warn: (obj: any, msg: string) => void }) {
+    if (!this.pool || !this.storeKey) return;
+    const nowSec = BigInt(Math.floor(Date.now() / 1000));
+    await deleteExpiredYellowSessions(this.pool, nowSec);
+    const rows = await listActiveYellowSessions(this.pool, nowSec);
+    for (const row of rows) {
+      try {
+        const payload = decryptJson<{
+          wallet: Address;
+          application: string;
+          scope: string;
+          sessionKey: Address;
+          sessionPrivateKey: Hex;
+          expiresAt: string;
+          allowances: RPCAllowance[];
+          jwtToken?: string;
+          activatedAtMs: number;
+        }>(this.storeKey, {
+          v: 1,
+          ivB64: row.enc_iv,
+          tagB64: row.enc_tag,
+          dataB64: row.enc_data,
+        });
+
+        this.sessions.setActive({
+          wallet: payload.wallet,
+          application: payload.application,
+          scope: payload.scope,
+          sessionKey: payload.sessionKey,
+          sessionPrivateKey: payload.sessionPrivateKey,
+          expiresAt: BigInt(payload.expiresAt),
+          allowances: payload.allowances,
+          jwtToken: payload.jwtToken,
+          activatedAtMs: payload.activatedAtMs,
+        });
+      } catch (err) {
+        log.warn({ err, wallet: row.wallet }, "failed to hydrate yellow session");
+      }
     }
   }
 
@@ -175,12 +229,22 @@ export class YellowService {
       jwtToken: parsed.params.jwtToken,
       activatedAtMs: Date.now(),
     });
+    await this.persistActive(wallet).catch(() => {
+      // best effort
+    });
 
     return {
       ok: true as const,
       wallet: parsed.params.address,
       sessionKey: parsed.params.sessionKey,
     };
+  }
+
+  async clearActive(wallet: Address) {
+    this.sessions.clearActive(wallet);
+    if (this.pool && this.storeKey) {
+      await deleteYellowSession(this.pool, wallet);
+    }
   }
 
   async getLedgerBalances(wallet: Address) {
@@ -322,5 +386,32 @@ export class YellowService {
     }
 
     return parsed.params.transactions;
+  }
+
+  private async persistActive(wallet: Address) {
+    if (!this.pool || !this.storeKey) return;
+    const active = this.sessions.getActive(wallet);
+    if (!active) return;
+
+    const blob = encryptJson(this.storeKey, {
+      wallet: active.wallet,
+      application: active.application,
+      scope: active.scope,
+      sessionKey: active.sessionKey,
+      sessionPrivateKey: active.sessionPrivateKey,
+      expiresAt: active.expiresAt.toString(),
+      allowances: active.allowances,
+      jwtToken: active.jwtToken,
+      activatedAtMs: active.activatedAtMs,
+    });
+
+    await upsertYellowSession(this.pool, {
+      wallet: active.wallet,
+      expiresAt: active.expiresAt,
+      encVersion: blob.v,
+      encIv: blob.ivB64,
+      encTag: blob.tagB64,
+      encData: blob.dataB64,
+    });
   }
 }
