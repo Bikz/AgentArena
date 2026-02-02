@@ -15,6 +15,17 @@ type ReplayData = {
     agent_name: string;
     strategy: string;
   }>;
+  payments?: Array<{
+    id: number;
+    created_at: string;
+    match_id: string | null;
+    kind: "entry" | "refund" | "payout";
+    asset: string;
+    amount: string;
+    from_wallet: string | null;
+    to_wallet: string | null;
+    client_id: string | null;
+  }>;
   ticks: Array<{
     tick: number;
     ts: string;
@@ -78,6 +89,52 @@ export async function ReplayView({ matchId }: { matchId: string }) {
           </Link>
         </div>
       </header>
+
+      {data.payments && data.payments.length > 0 ? (
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="text-base font-medium">Payouts</h2>
+          <div className="mt-1 text-sm text-muted-foreground">
+            Off-chain payment ledger events captured during this match.
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-2 pr-4 font-medium">Kind</th>
+                  <th className="py-2 pr-4 font-medium">Amount</th>
+                  <th className="py-2 pr-4 font-medium">From</th>
+                  <th className="py-2 pr-4 font-medium">To</th>
+                  <th className="py-2 pr-4 font-medium">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.payments.map((p) => (
+                  <tr key={p.id} className="border-t border-border">
+                    <td className="py-2 pr-4">{p.kind}</td>
+                    <td className="py-2 pr-4">
+                      {p.amount} {p.asset}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {p.from_wallet
+                        ? `${p.from_wallet.slice(0, 6)}…${p.from_wallet.slice(-4)}`
+                        : "—"}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {p.to_wallet
+                        ? `${p.to_wallet.slice(0, 6)}…${p.to_wallet.slice(-4)}`
+                        : "—"}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {new Date(p.created_at).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-2xl border border-border bg-card p-5">
         <h2 className="text-base font-medium">Ticks</h2>
