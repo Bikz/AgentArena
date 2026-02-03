@@ -268,6 +268,9 @@ export function buildApp() {
     rakeRecipient: process.env.ONCHAIN_RAKE_RECIPIENT,
     rakeBps: Number.isFinite(onchainRakeBps) ? onchainRakeBps : 0,
   });
+  const demoAllowBots =
+    process.env.DEMO_ALLOW_BOTS === "1" ||
+    (process.env.NODE_ENV !== "production" && process.env.DEMO_ALLOW_BOTS !== "0");
 
   const matchTickIntervalMs = Number(process.env.MATCH_TICK_INTERVAL_MS ?? "1500");
   const matchMaxTicks = Number(process.env.MATCH_MAX_TICKS ?? "40");
@@ -324,6 +327,9 @@ export function buildApp() {
       houseConfigured: Boolean(housePrivateKey),
       sessionPersistence: yellowSessionPersistenceEnabled,
     },
+    demo: {
+      allowBots: demoAllowBots && !paidMatches,
+    },
     onchain: onchain.getConfig(),
   }));
   app.get("/config", async () => ({
@@ -343,6 +349,36 @@ export function buildApp() {
       rakeBps: onchain.getConfig().rakeBps,
     },
   }));
+
+  const DemoFillQuery = z.object({
+    count: z.coerce.number().int().min(1).max(5).optional(),
+  });
+  app.post(
+    "/demo/fill",
+    { schema: { querystring: DemoFillQuery } },
+    async (req, reply) => {
+      if (!demoAllowBots) return reply.code(403).send({ error: "demo_disabled" as const });
+      if (paidMatches)
+        return reply.code(400).send({ error: "paid_matches_enabled" as const });
+
+      const openSeats = Math.max(0, 5 - engine.getQueueSize());
+      const desired = req.query.count ?? openSeats;
+      const toAdd = Math.max(0, Math.min(openSeats, desired));
+
+      if (toAdd === 0) return { ok: true as const, added: 0 };
+
+      const botStrategies = ["trend", "mean_revert", "random", "hold"] as const;
+      for (let i = 0; i < toAdd; i += 1) {
+        const strategy = botStrategies[i % botStrategies.length];
+        engine.joinQueue({
+          clientId: `bot-${crypto.randomUUID()}`,
+          agentName: `Bot ${strategy}`,
+          strategy,
+        });
+      }
+      return { ok: true as const, added: toAdd };
+    },
+  );
 
   app.get("/auth/me", async (req) => {
     const session = req.session as any;

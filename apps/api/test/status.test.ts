@@ -12,6 +12,7 @@ describe("GET /status", () => {
     expect(typeof json.yellow?.paidMatches).toBe("boolean");
     expect(typeof json.yellow?.houseConfigured).toBe("boolean");
     expect(typeof json.yellow?.sessionPersistence).toBe("boolean");
+    expect(typeof json.demo?.allowBots).toBe("boolean");
     await app.close();
   });
 });
