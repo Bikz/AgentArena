@@ -52,6 +52,7 @@ export function Lobby() {
       houseConfigured: boolean;
       sessionPersistence: boolean;
     };
+    demo?: { allowBots: boolean };
     onchain?: {
       enabled: boolean;
       contractAddress: string | null;
@@ -67,6 +68,8 @@ export function Lobby() {
   } | null>(null);
   const [seatedMatchId, setSeatedMatchId] = useState<string | null>(null);
   const [yellowReady, setYellowReady] = useState<boolean>(false);
+  const [demoState, setDemoState] = useState<"idle" | "loading" | "error">("idle");
+  const [demoError, setDemoError] = useState<string | null>(null);
 
   const { state, events, send } = useWsEvents();
   const auth = useAuth();
@@ -401,6 +404,7 @@ export function Lobby() {
                 {status.yellow.configured ? "on" : "off"}
               </span>
               {status.ai ? <span>AI: {status.ai.enabled ? "on" : "off"}</span> : null}
+              {status.demo?.allowBots ? <span>Demo bots: on</span> : null}
               {status.onchain ? (
                 <span>On-chain: {status.onchain.enabled ? "on" : "off"}</span>
               ) : null}
@@ -534,6 +538,35 @@ export function Lobby() {
                 Leave queue
               </button>
             ) : null}
+            {status?.demo?.allowBots && queueState === "idle" ? (
+              <button
+                type="button"
+                disabled={demoState === "loading"}
+                onClick={async () => {
+                  setDemoState("loading");
+                  setDemoError(null);
+                  try {
+                    const base =
+                      process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
+                    const res = await fetch(`${base}/demo/fill`, {
+                      method: "POST",
+                      cache: "no-store",
+                    });
+                    if (!res.ok) {
+                      const text = await res.text();
+                      throw new Error(text || "Failed to fill demo seats.");
+                    }
+                    setDemoState("idle");
+                  } catch (err) {
+                    setDemoState("error");
+                    setDemoError(err instanceof Error ? err.message : "Unknown error");
+                  }
+                }}
+                className="rounded-xl border border-border bg-background px-4 py-2 text-sm text-foreground disabled:opacity-50"
+              >
+                {demoState === "loading" ? "Filling seats…" : "Fill seats (demo)"}
+              </button>
+            ) : null}
           </div>
 
           <div className="text-sm text-muted-foreground">
@@ -570,6 +603,13 @@ export function Lobby() {
             <div className="mt-1 text-destructive-foreground/80">
               {latestError.message}
             </div>
+          </div>
+        ) : null}
+
+        {demoError ? (
+          <div className="md:col-span-3 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">
+            <div className="font-medium">Demo fill failed</div>
+            <div className="mt-1 text-destructive-foreground/80">{demoError}</div>
           </div>
         ) : null}
       </form>
