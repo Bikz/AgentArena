@@ -43,6 +43,23 @@ export type MatchPerformanceRow = {
   leaderboard: unknown | null;
 };
 
+export type AgentLeaderboardRow = {
+  agent_id: string;
+  agent_name: string;
+  matches: number;
+  wins: number;
+  avg_credits: string | null;
+  best_credits: string | null;
+};
+
+export type PlayerLeaderboardRow = {
+  owner_address: string;
+  matches: number;
+  wins: number;
+  avg_credits: string | null;
+  best_credits: string | null;
+};
+
 export type MatchPaymentRow = {
   id: number;
   created_at: string;
@@ -371,6 +388,104 @@ export async function listPlayerPerformance(
     limit $2
     `,
     [input.ownerAddress, input.limit],
+  );
+  return res.rows;
+}
+
+export async function listAgentLeaderboard(
+  pool: Pool,
+  input: { limit: number; minMatches: number; sinceDays?: number | null },
+) {
+  const res = await pool.query<AgentLeaderboardRow>(
+    `
+    with latest_tick as (
+      select distinct on (match_id) match_id, tick, leaderboard
+      from match_ticks
+      order by match_id, tick desc
+    ),
+    leaderboard_rows as (
+      select
+        lt.match_id,
+        s.agent_id,
+        s.agent_name,
+        coalesce((e->>'credits')::numeric, 0) as credits
+      from latest_tick lt
+      join matches m on m.id = lt.match_id
+      cross join lateral jsonb_array_elements(lt.leaderboard) e
+      join match_seats s
+        on s.match_id = lt.match_id
+       and s.seat_id = (e->>'seatId')
+      where ($3::int is null or m.created_at >= now() - ($3::int * interval '1 day'))
+    ),
+    ranked as (
+      select
+        *,
+        dense_rank() over (partition by match_id order by credits desc nulls last) as rank
+      from leaderboard_rows
+    )
+    select
+      agent_id,
+      agent_name,
+      count(*)::int as matches,
+      sum(case when rank = 1 then 1 else 0 end)::int as wins,
+      avg(credits) as avg_credits,
+      max(credits) as best_credits
+    from ranked
+    where agent_id is not null
+    group by agent_id, agent_name
+    having count(*) >= $2
+    order by wins desc, avg_credits desc nulls last
+    limit $1
+    `,
+    [input.limit, input.minMatches, input.sinceDays ?? null],
+  );
+  return res.rows;
+}
+
+export async function listPlayerLeaderboard(
+  pool: Pool,
+  input: { limit: number; minMatches: number; sinceDays?: number | null },
+) {
+  const res = await pool.query<PlayerLeaderboardRow>(
+    `
+    with latest_tick as (
+      select distinct on (match_id) match_id, tick, leaderboard
+      from match_ticks
+      order by match_id, tick desc
+    ),
+    leaderboard_rows as (
+      select
+        lt.match_id,
+        s.owner_address,
+        coalesce((e->>'credits')::numeric, 0) as credits
+      from latest_tick lt
+      join matches m on m.id = lt.match_id
+      cross join lateral jsonb_array_elements(lt.leaderboard) e
+      join match_seats s
+        on s.match_id = lt.match_id
+       and s.seat_id = (e->>'seatId')
+      where ($3::int is null or m.created_at >= now() - ($3::int * interval '1 day'))
+    ),
+    ranked as (
+      select
+        *,
+        dense_rank() over (partition by match_id order by credits desc nulls last) as rank
+      from leaderboard_rows
+    )
+    select
+      owner_address,
+      count(*)::int as matches,
+      sum(case when rank = 1 then 1 else 0 end)::int as wins,
+      avg(credits) as avg_credits,
+      max(credits) as best_credits
+    from ranked
+    where owner_address is not null
+    group by owner_address
+    having count(*) >= $2
+    order by wins desc, avg_credits desc nulls last
+    limit $1
+    `,
+    [input.limit, input.minMatches, input.sinceDays ?? null],
   );
   return res.rows;
 }

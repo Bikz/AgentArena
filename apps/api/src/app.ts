@@ -23,6 +23,8 @@ import {
   listMatches,
   listAgentPerformance,
   listPlayerPerformance,
+  listAgentLeaderboard,
+  listPlayerLeaderboard,
   attachLatestEntryPaymentToMatch,
   insertMatchPayment,
   setAgentEns,
@@ -64,6 +66,25 @@ type PerformanceMatch = {
   finalTarget: number | null;
   finalNote: string | null;
   isWinner: boolean;
+};
+
+type LeaderboardEntry = {
+  id: string;
+  name: string;
+  matches: number;
+  wins: number;
+  winRate: number;
+  avgCredits: number | null;
+  bestCredits: number | null;
+};
+
+type PlayerLeaderboardEntry = {
+  address: string;
+  matches: number;
+  wins: number;
+  winRate: number;
+  avgCredits: number | null;
+  bestCredits: number | null;
 };
 
 const buildPerformanceResponse = (
@@ -475,6 +496,11 @@ export function buildApp() {
   const PerfQuery = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
   });
+  const LeaderboardQuery = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    minMatches: z.coerce.number().int().min(1).max(1000).optional(),
+    sinceDays: z.coerce.number().int().min(1).max(3650).optional(),
+  });
   app.get(
     "/matches",
     { schema: { querystring: MatchesQuery } },
@@ -483,6 +509,63 @@ export function buildApp() {
       const limit = req.query.limit ?? 25;
       const matches = await listMatches(pool, { limit });
       return { matches };
+    },
+  );
+
+  app.get(
+    "/leaderboards/agents",
+    { schema: { querystring: LeaderboardQuery } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const limit = req.query.limit ?? 25;
+      const minMatches = req.query.minMatches ?? 1;
+      const rows = await listAgentLeaderboard(pool, {
+        limit,
+        minMatches,
+        sinceDays: req.query.sinceDays ?? null,
+      });
+      const leaders: LeaderboardEntry[] = rows.map((row) => {
+        const matches = row.matches ?? 0;
+        const wins = row.wins ?? 0;
+        return {
+          id: row.agent_id,
+          name: row.agent_name,
+          matches,
+          wins,
+          winRate: matches ? wins / matches : 0,
+          avgCredits: row.avg_credits ? Number(row.avg_credits) : null,
+          bestCredits: row.best_credits ? Number(row.best_credits) : null,
+        };
+      });
+      return { updatedAt: new Date().toISOString(), leaders };
+    },
+  );
+
+  app.get(
+    "/leaderboards/players",
+    { schema: { querystring: LeaderboardQuery } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const limit = req.query.limit ?? 25;
+      const minMatches = req.query.minMatches ?? 1;
+      const rows = await listPlayerLeaderboard(pool, {
+        limit,
+        minMatches,
+        sinceDays: req.query.sinceDays ?? null,
+      });
+      const leaders: PlayerLeaderboardEntry[] = rows.map((row) => {
+        const matches = row.matches ?? 0;
+        const wins = row.wins ?? 0;
+        return {
+          address: row.owner_address,
+          matches,
+          wins,
+          winRate: matches ? wins / matches : 0,
+          avgCredits: row.avg_credits ? Number(row.avg_credits) : null,
+          bestCredits: row.best_credits ? Number(row.best_credits) : null,
+        };
+      });
+      return { updatedAt: new Date().toISOString(), leaders };
     },
   );
 
