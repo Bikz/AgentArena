@@ -243,16 +243,25 @@ export async function upsertSeat(
     agentId: string | null;
     agentName: string;
     strategy: string;
+    ownerAddress?: string | null;
   },
 ) {
   await pool.query(
-    `insert into match_seats (match_id, seat_id, agent_id, agent_name, strategy)
-     values ($1, $2, $3, $4, $5)
+    `insert into match_seats (match_id, seat_id, agent_id, agent_name, strategy, owner_address)
+     values ($1, $2, $3, $4, $5, $6)
      on conflict (match_id, seat_id) do update
        set agent_id = excluded.agent_id,
            agent_name = excluded.agent_name,
-           strategy = excluded.strategy`,
-    [input.matchId, input.seatId, input.agentId, input.agentName, input.strategy],
+           strategy = excluded.strategy,
+           owner_address = excluded.owner_address`,
+    [
+      input.matchId,
+      input.seatId,
+      input.agentId,
+      input.agentName,
+      input.strategy,
+      input.ownerAddress ?? null,
+    ],
   );
 }
 

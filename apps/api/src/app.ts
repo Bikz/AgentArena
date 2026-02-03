@@ -574,6 +574,7 @@ export function buildApp() {
           agentId: seat.agentId ?? null,
           agentName: seat.agentName,
           strategy: seat.strategy,
+          ownerAddress: seat.ownerAddress ?? null,
         });
       }
     },
