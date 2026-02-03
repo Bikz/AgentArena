@@ -4,7 +4,6 @@ import { type ServerEvent } from "@agent-arena/shared";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useWsEvents } from "@/hooks/useWsEvents";
-import { ConnectWalletButton } from "@/components/connect-wallet-button";
 import { useAuth } from "@/hooks/useAuth";
 
 type Strategy = "hold" | "random" | "trend" | "mean_revert";
@@ -286,77 +285,42 @@ export function Lobby() {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-base font-medium">Lobby</h2>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-medium">Join queue</h2>
+            <div className="text-sm text-muted-foreground">
+              Status: {state} · Queue: {queue ? queue.queueSize : "—"}
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {auth.isSignedIn ? "Signed in" : "Sign in from the top bar to join"}
+          </div>
+        </div>
+
+        {paidMatches ? (
           <div className="text-sm text-muted-foreground">
-            Status: {state} · Queue: {queue ? queue.queueSize : "—"}
+            Paid matches enabled · Entry:{" "}
+            {entry ? `${entry.amount} ${entry.asset}` : "—"} (base units)
           </div>
-          {paidMatches ? (
-            <div className="text-sm text-muted-foreground">
-              Paid matches enabled · Entry:{" "}
-              {entry ? `${entry.amount} ${entry.asset}` : "—"} (base units)
-            </div>
-          ) : null}
-          {matchConfig ? (
-            <div className="text-sm text-muted-foreground">
-              Match: {Math.round(matchConfig.tickIntervalMs / 1000)}s ticks ·{" "}
-              {matchConfig.maxTicks} ticks · Start price: $
-              {Number(matchConfig.startPrice).toLocaleString()}
-            </div>
-          ) : null}
-          {onchainConfig?.enabled ? (
-            <div className="text-sm text-muted-foreground">
-              On-chain settlement enabled · Token: {onchainConfig.token ?? "erc20"}
-            </div>
-          ) : null}
-          {paidMatches && tickFee && tickFee.amount !== "0" ? (
-            <div className="text-sm text-muted-foreground">
-              Tick fee (per seat per tick): {tickFee.amount} {tickFee.asset} (base units)
-            </div>
-          ) : null}
-        </div>
-        <div className="flex flex-col items-start gap-2 md:items-end">
-          <ConnectWalletButton />
-          <div className="flex items-center gap-3">
-            {auth.isSignedIn ? (
-              <>
-                <div className="text-sm text-muted-foreground">
-                  Signed in
-                </div>
-                {auth.sessionAddress ? (
-                  <Link
-                    href={`/players/${auth.sessionAddress}`}
-                    className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-                  >
-                    My profile
-                  </Link>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => auth.signOut()}
-                  className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-                >
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                disabled={auth.state === "signing" || auth.state === "loading"}
-                onClick={() => auth.signIn()}
-                className="text-sm text-muted-foreground underline-offset-4 hover:underline disabled:opacity-50"
-              >
-                {auth.state === "signing" ? "Signing…" : "Sign in"}
-              </button>
-            )}
+        ) : null}
+        {matchConfig ? (
+          <div className="text-sm text-muted-foreground">
+            Match: {Math.round(matchConfig.tickIntervalMs / 1000)}s ticks ·{" "}
+            {matchConfig.maxTicks} ticks · Start price: $
+            {Number(matchConfig.startPrice).toLocaleString()}
           </div>
-          {auth.error ? (
-            <div className="text-sm text-destructive-foreground/80">
-              {auth.error}
-            </div>
-          ) : null}
-        </div>
+        ) : null}
+        {onchainConfig?.enabled ? (
+          <div className="text-sm text-muted-foreground">
+            On-chain settlement enabled · Token: {onchainConfig.token ?? "erc20"}
+          </div>
+        ) : null}
+        {paidMatches && tickFee && tickFee.amount !== "0" ? (
+          <div className="text-sm text-muted-foreground">
+            Tick fee (per seat per tick): {tickFee.amount} {tickFee.asset} (base units)
+          </div>
+        ) : null}
       </div>
 
       <form
