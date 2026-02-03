@@ -284,47 +284,53 @@ export function Lobby() {
   }, [latestError, queueState]);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-medium">Join queue</h2>
-            <div className="text-sm text-muted-foreground">
-              Status: {state} · Queue: {queue ? queue.queueSize : "—"}
-            </div>
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Queue
           </div>
-          <div className="text-xs text-muted-foreground">
-            {auth.isSignedIn ? "Signed in" : "Sign in from the top bar to join"}
+          <h2 className="text-base font-medium">Join the next match</h2>
+          <div className="mt-1 text-sm text-muted-foreground">
+            {queue ? `${queue.queueSize}/5 seats filled` : "Queue unavailable"} · WS {state}
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="rounded-full border border-border bg-muted/40 px-2 py-1">
+            {auth.isSignedIn ? "Signed in" : "Sign in to join"}
+          </span>
+          {status?.demo?.allowBots ? (
+            <span className="rounded-full border border-border bg-muted/40 px-2 py-1">
+              Demo bots on
+            </span>
+          ) : null}
+        </div>
+      </div>
 
-        {paidMatches ? (
-          <div className="text-sm text-muted-foreground">
-            Paid matches enabled · Entry:{" "}
-            {entry ? `${entry.amount} ${entry.asset}` : "—"} (base units)
-          </div>
-        ) : null}
-        {matchConfig ? (
-          <div className="text-sm text-muted-foreground">
-            Match: {Math.round(matchConfig.tickIntervalMs / 1000)}s ticks ·{" "}
-            {matchConfig.maxTicks} ticks · Start price: $
-            {Number(matchConfig.startPrice).toLocaleString()}
-          </div>
-        ) : null}
-        {onchainConfig?.enabled ? (
-          <div className="text-sm text-muted-foreground">
-            On-chain settlement enabled · Token: {onchainConfig.token ?? "erc20"}
-          </div>
-        ) : null}
+      <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+        <div>
+          Entry: {paidMatches ? `${entry?.amount ?? "—"} ${entry?.asset ?? ""}` : "Free"}
+          {paidMatches ? " (base units)" : ""}
+        </div>
+        <div>
+          Tick: {matchConfig ? Math.round(matchConfig.tickIntervalMs / 1000) : "—"}s ·{" "}
+          {matchConfig?.maxTicks ?? "—"} ticks
+        </div>
+        <div>
+          Start price: {matchConfig ? `$${Number(matchConfig.startPrice).toLocaleString()}` : "—"}
+        </div>
+        <div>
+          Settlement: {onchainConfig?.enabled ? "On-chain + Yellow" : "Yellow session"}
+        </div>
         {paidMatches && tickFee && tickFee.amount !== "0" ? (
-          <div className="text-sm text-muted-foreground">
-            Tick fee (per seat per tick): {tickFee.amount} {tickFee.asset} (base units)
+          <div className="sm:col-span-2">
+            Tick fee: {tickFee.amount} {tickFee.asset} (per seat per tick)
           </div>
         ) : null}
       </div>
 
       <form
-        className="mt-4 grid gap-3 md:grid-cols-3"
+        className="mt-5 grid gap-3 md:grid-cols-3"
         onSubmit={(e) => {
           e.preventDefault();
           if (!canJoin) return;
@@ -361,36 +367,28 @@ export function Lobby() {
         }}
       >
         {status ? (
-          <div className="md:col-span-3 rounded-xl border border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground">
+          <div className="md:col-span-3 rounded-xl border border-border bg-background/60 px-3 py-2 text-xs text-muted-foreground">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>
-                DB: {status.db.configured ? "on" : "off"} · Yellow:{" "}
-                {status.yellow.configured ? "on" : "off"}
-              </span>
+              <span>DB: {status.db.configured ? "on" : "off"}</span>
+              <span>Yellow: {status.yellow.configured ? "on" : "off"}</span>
               {status.ai ? <span>AI: {status.ai.enabled ? "on" : "off"}</span> : null}
-              {status.demo?.allowBots ? <span>Demo bots: on</span> : null}
               {status.onchain ? (
                 <span>On-chain: {status.onchain.enabled ? "on" : "off"}</span>
               ) : null}
               {status.onchain?.enabled && !status.onchain.contractAddress ? (
                 <span className="text-destructive-foreground/80">
-                  On-chain enabled but contract missing.
-                </span>
-              ) : null}
-              {status.onchain?.enabled && !status.onchain.houseAddress ? (
-                <span className="text-destructive-foreground/80">
-                  On-chain enabled but house wallet missing.
+                  Contract missing.
                 </span>
               ) : null}
               {status.yellow.paidMatches && !status.yellow.houseConfigured ? (
                 <span className="text-destructive-foreground/80">
-                  Paid matches misconfigured: missing house wallet.
+                  House wallet missing.
                 </span>
               ) : null}
               {status.yellow.paidMatches && !status.yellow.sessionPersistence ? (
                 <span>
-                  Tip: set <span className="font-mono">YELLOW_SESSION_STORE_KEY_BASE64</span>{" "}
-                  to survive restarts.
+                  Tip: set{" "}
+                  <span className="font-mono">YELLOW_SESSION_STORE_KEY_BASE64</span>.
                 </span>
               ) : null}
             </div>
@@ -472,13 +470,12 @@ export function Lobby() {
             </Link>
           </div>
         </div>
-
-        <div className="md:col-span-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="md:col-span-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="submit"
               disabled={!canJoin}
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {queueState === "queued"
                 ? "Queued"
@@ -497,7 +494,7 @@ export function Lobby() {
                   setQueuedAgent(null);
                   setSeatedMatchId(null);
                 }}
-                className="rounded-xl border border-border bg-background px-4 py-2 text-sm text-foreground"
+                className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted/40"
               >
                 Leave queue
               </button>
@@ -526,7 +523,7 @@ export function Lobby() {
                     setDemoError(err instanceof Error ? err.message : "Unknown error");
                   }
                 }}
-                className="rounded-xl border border-border bg-background px-4 py-2 text-sm text-foreground disabled:opacity-50"
+                className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted/40 disabled:opacity-50"
               >
                 {demoState === "loading" ? "Filling seats…" : "Fill seats (demo)"}
               </button>

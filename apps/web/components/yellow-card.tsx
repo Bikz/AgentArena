@@ -62,7 +62,7 @@ export function YellowCard() {
   }, [balances]);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-medium">Yellow Network</h2>
         <div className="text-sm text-muted-foreground">
@@ -83,7 +83,7 @@ export function YellowCard() {
             type="button"
             disabled={auth.state === "signing" || auth.state === "loading"}
             onClick={() => auth.signIn()}
-            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            className="rounded-full bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             {auth.state === "signing" ? "Signing…" : "Sign in"}
           </button>
@@ -165,7 +165,7 @@ export function YellowCard() {
                   setError(err instanceof Error ? err.message : "Unknown error");
                 }
               }}
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {isReady ? "Re-enable session" : state === "enabling" ? "Enabling…" : "Enable Yellow"}
             </button>
@@ -174,7 +174,7 @@ export function YellowCard() {
               type="button"
               disabled={!auth.isSignedIn || state === "enabling"}
               onClick={() => void refresh()}
-              className="rounded-xl border border-border bg-background px-4 py-2 text-sm text-foreground disabled:opacity-50"
+              className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted/40 disabled:opacity-50"
             >
               Refresh balance
             </button>
@@ -202,7 +202,7 @@ export function YellowCard() {
                   setError(err instanceof Error ? err.message : "Unknown error");
                 }
               }}
-              className="rounded-xl border border-border bg-background px-4 py-2 text-sm text-foreground disabled:opacity-50"
+              className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted/40 disabled:opacity-50"
             >
               Request faucet tokens
             </button>
@@ -224,4 +224,3 @@ export function YellowCard() {
     </section>
   );
 }
-

@@ -36,7 +36,7 @@ export default async function AgentsPage() {
         </div>
         <Link
           href="/agents/new"
-          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           Create agent
         </Link>

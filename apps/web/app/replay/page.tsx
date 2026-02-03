@@ -81,14 +81,14 @@ export default async function ReplaysIndexPage() {
                 <div className="mt-4 flex items-center gap-3 text-sm">
                   <Link
                     href={`/replay/${match.id}`}
-                    className="rounded-full border border-border px-3 py-1 text-xs"
+                    className="rounded-full border border-border px-3 py-1 text-xs transition-colors hover:bg-muted/40"
                   >
                     Replay
                   </Link>
                   {isLive ? (
                     <Link
                       href={`/match/${match.id}`}
-                      className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground"
+                      className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                       Watch live
                     </Link>

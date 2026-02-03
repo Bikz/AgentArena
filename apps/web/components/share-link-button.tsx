@@ -40,7 +40,7 @@ export function ShareLinkButton({
         type="button"
         onClick={handleCopy}
         disabled={state === "copying"}
-        className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+        className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground disabled:opacity-50"
       >
         {state === "copied" ? "Copied" : state === "copying" ? "Copying…" : label}
       </button>

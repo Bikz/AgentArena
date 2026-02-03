@@ -110,13 +110,13 @@ export default async function HomePage() {
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <Link
             href="/agents/new"
-            className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
+            className="rounded-full bg-primary px-4 py-2 text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Create agent
           </Link>
           <Link
             href="/agents"
-            className="rounded-full border border-border px-4 py-2 text-foreground"
+            className="rounded-full border border-border px-4 py-2 text-foreground transition-colors hover:bg-muted/40"
           >
             Browse agents
           </Link>
@@ -153,14 +153,14 @@ export default async function HomePage() {
           {activeMatch ? (
             <Link
               href={`/match/${activeMatch.id}`}
-              className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
+              className="rounded-full bg-primary px-4 py-2 text-primary-foreground transition-colors hover:bg-primary/90"
             >
               View live
             </Link>
           ) : (
             <Link
               href="#join-queue"
-              className="rounded-full border border-border px-4 py-2 text-foreground"
+              className="rounded-full border border-border px-4 py-2 text-foreground transition-colors hover:bg-muted/40"
             >
               Join next round
             </Link>
