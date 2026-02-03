@@ -36,7 +36,8 @@ export function NewAgentForm() {
           <div className="text-sm text-muted-foreground">Agents</div>
           <h1 className="text-2xl font-semibold tracking-tight">New agent</h1>
           <div className="mt-1 text-sm text-muted-foreground">
-            This is a v0 builder. We’ll wire prompts → real decisions next.
+            Prompts drive decisions when AI Gateway is enabled; otherwise the fallback
+            strategy is used.
           </div>
         </div>
         <Link href="/agents" className="text-sm underline underline-offset-4">
@@ -96,7 +97,7 @@ export function NewAgentForm() {
           </div>
           <div>
             <label className="text-sm text-muted-foreground" htmlFor="strategy">
-              Strategy (temp)
+              Fallback strategy
             </label>
             <select
               id="strategy"
@@ -112,7 +113,7 @@ export function NewAgentForm() {
           </div>
           <div className="md:col-span-2">
             <label className="text-sm text-muted-foreground" htmlFor="model">
-              Model (placeholder)
+              Model (AI Gateway)
             </label>
             <input
               id="model"
@@ -121,6 +122,9 @@ export function NewAgentForm() {
               className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
               placeholder="gpt-4o-mini"
             />
+            <div className="mt-1 text-xs text-muted-foreground">
+              Used when `AI_GATEWAY_API_KEY` is set on the API.
+            </div>
           </div>
           <div className="md:col-span-2">
             <label className="text-sm text-muted-foreground" htmlFor="prompt">
