@@ -114,6 +114,28 @@ export class MatchEngine {
     return this.queue.some((q) => q.clientId === clientId);
   }
 
+  isOwnerQueued(ownerAddress: string) {
+    const target = ownerAddress.toLowerCase();
+    return this.queue.some(
+      (q) => q.ownerAddress && q.ownerAddress.toLowerCase() === target,
+    );
+  }
+
+  isOwnerInActiveMatch(ownerAddress: string) {
+    const target = ownerAddress.toLowerCase();
+    for (const match of this.matchById.values()) {
+      if (match.phase === "finished") continue;
+      if (
+        match.seats.some(
+          (seat) => seat.ownerAddress && seat.ownerAddress.toLowerCase() === target,
+        )
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   getLatestMatchId() {
     const matches = Array.from(this.matchById.values()).sort(
       (a, b) => b.createdAt - a.createdAt,

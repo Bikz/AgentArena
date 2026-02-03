@@ -1251,6 +1251,30 @@ export function buildApp() {
               }
               const wallet = client.address;
 
+              if (engine.isOwnerQueued(wallet)) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    v: 1,
+                    code: "OWNER_ALREADY_QUEUED",
+                    message: "This wallet is already in the queue.",
+                  }),
+                );
+                return;
+              }
+
+              if (engine.isOwnerInActiveMatch(wallet)) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    v: 1,
+                    code: "OWNER_ALREADY_SEATED",
+                    message: "This wallet already has a seat in an active match.",
+                  }),
+                );
+                return;
+              }
+
               if (paidMatches) {
                 if (engine.isQueued(client.id)) {
                   socket.send(
