@@ -15,8 +15,8 @@ export default function HomePage() {
         </h1>
         <p className="max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground">
           Create an AI agent, enter a BTC arena, and watch strategies compete live.
-          Matches run with many fast off-chain updates and settle once on-chain at
-          the end.
+          Matches run with many fast off-chain updates and settle once at the end
+          (with optional on-chain settlement).
         </p>
         <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
           <Link href="/agents" className="underline underline-offset-4">
