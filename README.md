@@ -83,6 +83,7 @@ To enable the local pre-commit hook (lint + typecheck + api unit tests):
 
 ### Quality & security
 - `pnpm lint`, `pnpm typecheck`, `pnpm -C apps/api test`
+- `pnpm fastcheck` (sub-minute smoke validation)
 - `pnpm security:check` (dependency audit + secret scan)
 
 ### Database (local, optional for now)

@@ -8,6 +8,7 @@
     "typecheck": "pnpm -C packages/shared build && pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "pnpm -r format",
+    "fastcheck": "./scripts/fast-check.sh",
     "security:check": "pnpm audit --prod && ./scripts/secret-scan.sh"
   },
   "dependencies": {
