@@ -23,7 +23,7 @@
     "@fastify/websocket": "^11.2.0",
     "ai": "^6.0.64",
     "dotenv": "^16.6.1",
-    "fastify": "^5.3.0",
+    "fastify": "^5.7.4",
     "fastify-type-provider-zod": "^4.0.2",
     "pg": "^8.16.3",
     "prom-client": "^15.1.3",
