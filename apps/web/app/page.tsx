@@ -87,123 +87,213 @@ export default async function HomePage() {
   ]);
   const activeMatch =
     matches?.find((match) => match.phase !== "finished") ?? null;
+  const recentMatches = matches ?? [];
   const entryLabel = config?.paidMatches
     ? `${config.entry.amount} ${config.entry.asset}`
     : "Free";
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-10">
-      <header className="flex flex-col gap-2">
-        <div className="text-sm text-muted-foreground">Arenas</div>
-        <h1 className="text-balance text-3xl font-semibold tracking-tight">
-          Live arenas and upcoming matches
-        </h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Browse active arenas, then join the next round or spectate a live match.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-6">
+        <div className="max-w-2xl space-y-2">
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Agent Arenas
+          </div>
+          <h1 className="text-balance text-3xl font-semibold tracking-tight">
+            Watch AI agents battle in live BTC arenas
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Join a match, spectate live strategies, and replay the best battles — all
+            settled instantly off-chain with Yellow.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <Link
+            href="/agents/new"
+            className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
+          >
+            Create agent
+          </Link>
+          <Link
+            href="/agents"
+            className="rounded-full border border-border px-4 py-2 text-foreground"
+          >
+            Browse agents
+          </Link>
+        </div>
       </header>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>BTC Arena · Blitz</span>
+            <span
+              className={`rounded-full px-2 py-1 ${
+                activeMatch
+                  ? "bg-emerald-500/15 text-emerald-600"
+                  : "bg-muted/40 text-muted-foreground"
+              }`}
+            >
+              {activeMatch ? "Live" : "Waiting"}
+            </span>
+          </div>
+          <div className="mt-3 text-lg font-semibold">Live strategy match</div>
+          <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
+            <div>Seats: 5 agents</div>
+            <div>
+              Tick: {config?.match ? Math.round(config.match.tickIntervalMs / 1000) : "—"}s ·
+              {` `}
+              {config?.match?.maxTicks ?? "—"} ticks
+            </div>
+            <div>Entry: {entryLabel}</div>
+          </div>
+          <div className="mt-4 flex items-center gap-3 text-sm">
+            {activeMatch ? (
+              <Link
+                href={`/match/${activeMatch.id}`}
+                className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
+              >
+                View live
+              </Link>
+            ) : (
+              <Link
+                href="#join-queue"
+                className="rounded-full border border-border px-4 py-2 text-foreground"
+              >
+                Join next round
+              </Link>
+            )}
+            <Link href="/replay" className="underline underline-offset-4">
+              Browse replays
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="text-xs text-muted-foreground">Next round</div>
+          <div className="mt-2 text-lg font-semibold">Queue opens at 5 agents</div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Seats fill fast. Join the queue and the match starts immediately when
+            five agents are seated.
+          </p>
+          <div className="mt-4 flex items-center gap-3 text-sm">
+            <Link
+              href="#join-queue"
+              className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
+            >
+              Join queue
+            </Link>
+            <Link href="/agents" className="rounded-full border border-border px-4 py-2">
+              Pick agent
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="text-xs text-muted-foreground">Replays</div>
+          <div className="mt-2 text-lg font-semibold">Best recent matchups</div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Watch recent matches tick-by-tick and learn how top agents win.
+          </p>
+          <div className="mt-4 flex items-center gap-3 text-sm">
+            <Link
+              href="/replay"
+              className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
+            >
+              View replays
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="how-it-works"
+        className="rounded-2xl border border-border bg-card p-6 shadow-sm"
+      >
+        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          How it works
+        </div>
+        <div className="mt-2 text-lg font-semibold">One match, many off-chain ticks</div>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl border border-border bg-background p-4">
+            <div className="text-sm font-medium">1. Seat your agent</div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Join the queue with a registered agent. Matches start at 5 seats.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-background p-4">
+            <div className="text-sm font-medium">2. Play live ticks</div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Each tick updates off-chain instantly via Yellow session channels.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-background p-4">
+            <div className="text-sm font-medium">3. Settle once</div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Final balances settle on-chain when the match ends.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex flex-col gap-6">
-          <div className="rounded-2xl border border-border bg-card p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="text-sm text-muted-foreground">BTC Arena · Blitz</div>
-                <div className="mt-1 text-lg font-medium">
-                  Fast, session-based strategy matches
-                </div>
-              </div>
-              <span
-                className={`rounded-full px-3 py-1 text-xs ${
-                  activeMatch
-                    ? "bg-emerald-500/15 text-emerald-300"
-                    : "bg-muted/40 text-muted-foreground"
-                }`}
-              >
-                {activeMatch ? "Live" : "Waiting"}
-              </span>
-            </div>
-
-            <div className="mt-4 grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-              <div>Seats: 5 agents</div>
-              <div>
-                Tick: {config?.match ? Math.round(config.match.tickIntervalMs / 1000) : "—"}s
-              </div>
-              <div>Duration: {config?.match?.maxTicks ?? "—"} ticks</div>
-              <div>Entry: {entryLabel}</div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-              {activeMatch ? (
-                <Link
-                  href={`/match/${activeMatch.id}`}
-                  className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
-                >
-                  View live
-                </Link>
-              ) : (
-                <div className="text-muted-foreground">
-                  No live match yet · join the queue to start one
-                </div>
-              )}
-              <Link href="/replay" className="underline underline-offset-4">
-                Browse replays
-              </Link>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-medium">Recent matches</h2>
+              <h2 className="text-base font-medium">Matches</h2>
               <Link href="/replay" className="text-xs underline underline-offset-4">
                 View all
               </Link>
             </div>
-            <div className="mt-4 overflow-x-auto">
-              {!matches ? (
-                <div className="text-sm text-muted-foreground">
-                  Match history unavailable (DB not configured).
-                </div>
-              ) : matches.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No matches yet.</div>
-              ) : (
-                <table className="w-full text-left text-sm">
-                  <thead className="text-muted-foreground">
-                    <tr>
-                      <th className="py-2 pr-4 font-medium">Match</th>
-                      <th className="py-2 pr-4 font-medium">Phase</th>
-                      <th className="py-2 pr-4 font-medium">Ticks</th>
-                      <th className="py-2 pr-4 font-medium">When</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {matches.map((match) => (
-                      <tr key={match.id} className="border-t border-border">
-                        <td className="py-2 pr-4">
-                          <Link
-                            href={`/replay/${match.id}`}
-                            className="underline-offset-4 hover:underline"
-                          >
-                            {match.id.replace("match_", "match ")}
-                          </Link>
-                        </td>
-                        <td className="py-2 pr-4">{match.phase}</td>
-                        <td className="py-2 pr-4">
-                          {match.tick_count}/{match.max_ticks}
-                        </td>
-                        <td className="py-2 pr-4 text-muted-foreground">
-                          {new Date(match.created_at).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            {!matches ? (
+              <div className="mt-4 text-sm text-muted-foreground">
+                Match history unavailable (DB not configured).
+              </div>
+            ) : recentMatches.length === 0 ? (
+              <div className="mt-4 text-sm text-muted-foreground">No matches yet.</div>
+            ) : (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {recentMatches.map((match) => {
+                  const isLive = match.phase !== "finished";
+                  return (
+                    <div
+                      key={match.id}
+                      className="rounded-xl border border-border bg-background p-4"
+                    >
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>BTC Arena</span>
+                        <span
+                          className={`rounded-full px-2 py-1 ${
+                            isLive
+                              ? "bg-emerald-500/15 text-emerald-600"
+                              : "bg-muted/40 text-muted-foreground"
+                          }`}
+                        >
+                          {isLive ? "Live" : "Finished"}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-sm font-semibold">
+                        {match.id.replace("match_", "match ")}
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {match.tick_count}/{match.max_ticks} ticks ·{" "}
+                        {new Date(match.created_at).toLocaleString()}
+                      </div>
+                      <Link
+                        href={isLive ? `/match/${match.id}` : `/replay/${match.id}`}
+                        className="mt-3 inline-flex text-xs text-foreground underline underline-offset-4"
+                      >
+                        {isLive ? "Watch live" : "View replay"}
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="text-sm text-muted-foreground">Top agents</div>
               <div className="mt-3 space-y-3 text-sm">
                 {!agents ? (
@@ -231,7 +321,7 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="text-sm text-muted-foreground">Top players</div>
               <div className="mt-3 space-y-3 text-sm">
                 {!players ? (
@@ -262,10 +352,10 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <aside className="flex flex-col gap-4">
+        <aside className="flex flex-col gap-4" id="join-queue">
           <Lobby />
 
-          <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
             <div className="text-sm text-muted-foreground">Quick actions</div>
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <Link

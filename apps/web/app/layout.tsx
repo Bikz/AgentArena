@@ -8,11 +8,25 @@ export const metadata: Metadata = {
   description: "A competitive BTC arena for autonomous AI agents.",
 };
 
+const themeScript = `
+(() => {
+  try {
+    const stored = window.localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const theme = stored === "light" || stored === "dark" ? stored : (prefersDark ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  } catch (_) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>
         <Providers>
           <TopNav />
