@@ -64,7 +64,7 @@ export type MatchPaymentRow = {
   id: number;
   created_at: string;
   match_id: string | null;
-  kind: "entry" | "refund" | "payout" | "tick_fees";
+  kind: "entry" | "refund" | "payout" | "tick_fees" | "onchain_fund" | "onchain_settlement";
   asset: string;
   amount: string;
   from_wallet: string | null;
@@ -196,7 +196,7 @@ export async function insertMatchPayment(
   pool: Pool,
   input: {
     matchId: string | null;
-    kind: "entry" | "refund" | "payout" | "tick_fees";
+    kind: "entry" | "refund" | "payout" | "tick_fees" | "onchain_fund" | "onchain_settlement";
     asset: string;
     amount: string;
     fromWallet: string | null;

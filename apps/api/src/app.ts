@@ -35,6 +35,7 @@ import { decideSeatTarget } from "./agents/decide-seat.js";
 import { createBtcUsdPriceFeed } from "./prices/btc-usd.js";
 import crypto from "node:crypto";
 import { YellowService } from "./yellow/yellow.js";
+import { OnchainSettlementService } from "./onchain/settlement.js";
 import { EIP712AuthTypes } from "@erc7824/nitrolite";
 import { SiweMessage } from "siwe";
 
@@ -252,6 +253,22 @@ export function buildApp() {
   const payoutBps = 10_000n - rakeBps;
   const tickFeeAmount = BigInt(process.env.YELLOW_TICK_FEE_AMOUNT ?? "0");
 
+  const onchainEnabled = process.env.ONCHAIN_SETTLEMENT_ENABLED === "1";
+  const onchainTokenSymbol = process.env.ONCHAIN_TOKEN_SYMBOL ?? entryAsset;
+  const onchainRakeBps =
+    process.env.ONCHAIN_RAKE_BPS !== undefined
+      ? Number(process.env.ONCHAIN_RAKE_BPS)
+      : Number(process.env.YELLOW_RAKE_BPS ?? "2000");
+  const onchain = new OnchainSettlementService(app.log, {
+    enabled: onchainEnabled,
+    rpcUrl: process.env.ONCHAIN_RPC_URL,
+    tokenAddress: process.env.ONCHAIN_TOKEN_ADDRESS,
+    contractAddress: process.env.ONCHAIN_SETTLEMENT_CONTRACT,
+    housePrivateKey: process.env.ONCHAIN_HOUSE_PRIVATE_KEY as `0x${string}` | undefined,
+    rakeRecipient: process.env.ONCHAIN_RAKE_RECIPIENT,
+    rakeBps: Number.isFinite(onchainRakeBps) ? onchainRakeBps : 0,
+  });
+
   const matchTickIntervalMs = Number(process.env.MATCH_TICK_INTERVAL_MS ?? "1500");
   const matchMaxTicks = Number(process.env.MATCH_MAX_TICKS ?? "40");
   const matchStartPrice = Number(process.env.MATCH_START_PRICE ?? "100000");
@@ -306,6 +323,7 @@ export function buildApp() {
       houseConfigured: Boolean(housePrivateKey),
       sessionPersistence: yellowSessionPersistenceEnabled,
     },
+    onchain: onchain.getConfig(),
   }));
   app.get("/config", async () => ({
     paidMatches,
@@ -316,6 +334,12 @@ export function buildApp() {
       tickIntervalMs: Math.max(250, Math.floor(matchTickIntervalMs)),
       maxTicks: Math.max(1, Math.floor(matchMaxTicks)),
       startPrice: matchStartPrice,
+    },
+    onchain: {
+      enabled: onchain.isEnabled(),
+      token: onchain.getConfig().tokenAddress,
+      contract: onchain.getConfig().contractAddress,
+      rakeBps: onchain.getConfig().rakeBps,
     },
   }));
 
@@ -791,6 +815,34 @@ export function buildApp() {
           ownerAddress: seat.ownerAddress ?? null,
         });
       }
+
+      if (paidMatches && onchain.isEnabled()) {
+        const seatsWithOwners = (m.seats as any[]).filter((s) => s.ownerAddress);
+        if (seatsWithOwners.length > 0) {
+          const pot = entryAmount * BigInt(seatsWithOwners.length);
+          try {
+            const tx = await onchain.fundMatch(m.config.matchId, pot);
+            if (pool && tx) {
+              await insertMatchPayment(pool, {
+                matchId: m.config.matchId,
+                kind: "onchain_fund",
+                asset: onchainTokenSymbol,
+                amount: pot.toString(),
+                fromWallet: onchain.getConfig().houseAddress,
+                toWallet: onchain.getConfig().contractAddress,
+                clientId: null,
+                tx,
+              });
+            }
+            app.log.info(
+              { matchId: m.config.matchId, pot: pot.toString() },
+              "onchain match pot funded",
+            );
+          } catch (err) {
+            app.log.error({ err, matchId: m.config.matchId }, "onchain pot funding failed");
+          }
+        }
+      }
     },
     onTick: async (m: any) => {
       if (pool) {
@@ -905,6 +957,43 @@ export function buildApp() {
       const pot = entryAmount * BigInt(seatsWithOwners.length);
       const payout = (pot * payoutBps) / 10_000n;
       if (payout <= 0n) return;
+
+      if (onchain.isEnabled()) {
+        try {
+          const tx = await onchain.settleMatch(
+            m.config.matchId,
+            winner.ownerAddress as any,
+            onchainRakeBps,
+          );
+          if (pool && tx) {
+            await insertMatchPayment(pool, {
+              matchId: m.config.matchId,
+              kind: "onchain_settlement",
+              asset: onchainTokenSymbol,
+              amount: pot.toString(),
+              fromWallet: onchain.getConfig().contractAddress,
+              toWallet: winner.ownerAddress ?? null,
+              clientId: winner.clientId ?? null,
+              tx,
+            });
+          }
+          app.log.info(
+            {
+              matchId: m.config.matchId,
+              winner: winner.ownerAddress,
+              payout: payout.toString(),
+              asset: onchainTokenSymbol,
+            },
+            "onchain settlement sent",
+          );
+        } catch (err) {
+          app.log.error(
+            { err, matchId: m.config.matchId, winner: winner.ownerAddress },
+            "onchain settlement failed",
+          );
+        }
+        return;
+      }
 
       try {
         const tx = await yellow.houseTransfer(winner.ownerAddress as any, [
