@@ -323,6 +323,16 @@ export function Lobby() {
               {status.onchain ? (
                 <span>On-chain: {status.onchain.enabled ? "on" : "off"}</span>
               ) : null}
+              {status.onchain?.enabled && !status.onchain.contractAddress ? (
+                <span className="text-destructive-foreground/80">
+                  On-chain enabled but contract missing.
+                </span>
+              ) : null}
+              {status.onchain?.enabled && !status.onchain.houseAddress ? (
+                <span className="text-destructive-foreground/80">
+                  On-chain enabled but house wallet missing.
+                </span>
+              ) : null}
               {status.yellow.paidMatches && !status.yellow.houseConfigured ? (
                 <span className="text-destructive-foreground/80">
                   Paid matches misconfigured: missing house wallet.

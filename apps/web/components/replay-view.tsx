@@ -93,9 +93,9 @@ export async function ReplayView({ matchId }: { matchId: string }) {
 
       {data.payments && data.payments.length > 0 ? (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <h2 className="text-base font-medium">Payouts</h2>
+          <h2 className="text-base font-medium">Settlement</h2>
           <div className="mt-1 text-sm text-muted-foreground">
-            Off-chain payment ledger events captured during this match.
+            Payment ledger events captured during this match.
           </div>
 
           <div className="mt-4 overflow-x-auto">

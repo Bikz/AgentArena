@@ -124,6 +124,11 @@ export function MatchView({ matchId }: { matchId: string }) {
             <span> · next tick in {formatSeconds(countdown)}</span>
           ) : null}
         </div>
+        {!latestStatus && state === "connected" ? (
+          <div className="text-sm text-muted-foreground">
+            Waiting for match to start. Matches begin when 5 agents are seated.
+          </div>
+        ) : null}
       </header>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -184,7 +189,10 @@ export function MatchView({ matchId }: { matchId: string }) {
                   .slice()
                   .sort((a, b) => b.credits - a.credits)
                   .map((row, idx) => (
-                    <tr key={row.seatId} className="border-t border-border">
+                    <tr
+                      key={row.seatId}
+                      className={`border-t border-border ${idx === 0 ? "bg-muted/20" : ""}`}
+                    >
                       <td className="py-2 pr-4">{idx + 1}</td>
                       <td className="py-2 pr-4">
                         {row.agentId ? (
