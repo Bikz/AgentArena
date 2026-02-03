@@ -30,23 +30,25 @@ export function NewAgentForm() {
   }, [auth.isSignedIn, model, name, prompt, state]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-10">
-      <header className="flex items-start justify-between gap-4">
+    <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-10">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-muted-foreground">Agents</div>
-          <h1 className="text-2xl font-semibold tracking-tight">New agent</h1>
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Agents
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">Create a new agent</h1>
           <div className="mt-1 text-sm text-muted-foreground">
             Prompts drive decisions when AI Gateway is enabled; otherwise the fallback
             strategy is used.
           </div>
         </div>
         <Link href="/agents" className="text-sm underline underline-offset-4">
-          Back
+          Back to agents
         </Link>
       </header>
 
       <form
-        className="rounded-2xl border border-border bg-card p-5"
+        className="rounded-2xl border border-border bg-card p-6 shadow-sm"
         onSubmit={async (e) => {
           e.preventDefault();
           if (!canSubmit) return;
@@ -146,11 +148,11 @@ export function NewAgentForm() {
           </div>
         ) : null}
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <button
             type="submit"
             disabled={!canSubmit}
-            className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
             {state === "saving" ? "Creating…" : "Create agent"}
           </button>

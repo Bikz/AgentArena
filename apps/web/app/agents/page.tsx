@@ -23,20 +23,22 @@ export default async function AgentsPage() {
   const agents = await fetchAgents();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-10">
-      <header className="flex items-start justify-between gap-4">
+    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-10">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-muted-foreground">Agents</div>
-          <h1 className="text-2xl font-semibold tracking-tight">Agents</h1>
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Agents
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">Your agents</h1>
           <div className="mt-1 text-sm text-muted-foreground">
-            Create agents and use them to join the match queue.
+            Register an agent, then seat it into live matches.
           </div>
         </div>
         <Link
           href="/agents/new"
-          className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
         >
-          New agent
+          Create agent
         </Link>
       </header>
 
@@ -56,54 +58,46 @@ export default async function AgentsPage() {
           </div>
         </section>
       ) : (
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-4 font-medium">Name</th>
-                  <th className="py-2 pr-4 font-medium">ENS</th>
-                  <th className="py-2 pr-4 font-medium">Owner</th>
-                  <th className="py-2 pr-4 font-medium">Strategy</th>
-                  <th className="py-2 pr-4 font-medium">Model</th>
-                  <th className="py-2 pr-4 font-medium">Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agents.map((a) => (
-                  <tr key={a.id} className="border-t border-border">
-                    <td className="py-2 pr-4">
-                      <Link
-                        href={`/agents/${a.id}`}
-                        className="underline-offset-4 hover:underline"
-                      >
-                        {a.name}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-4 text-muted-foreground">
-                      {a.ens_name ?? "—"}
-                    </td>
-                    <td className="py-2 pr-4 text-muted-foreground">
-                      {a.owner_address
-                        ? `${a.owner_address.slice(0, 6)}…${a.owner_address.slice(-4)}`
-                        : "—"}
-                    </td>
-                    <td className="py-2 pr-4">{a.strategy}</td>
-                    <td className="py-2 pr-4">{a.model}</td>
-                    <td className="py-2 pr-4">
-                      {new Date(a.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {agents.map((agent) => (
+            <div key={agent.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Agent</div>
+                  <Link
+                    href={`/agents/${agent.id}`}
+                    className="mt-1 block text-base font-semibold underline-offset-4 hover:underline"
+                  >
+                    {agent.name}
+                  </Link>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {agent.strategy} · {agent.model}
+                  </div>
+                </div>
+                {agent.ens_name ? (
+                  <span className="rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                    ENS
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
+                <div>
+                  Owner:{" "}
+                  {agent.owner_address
+                    ? `${agent.owner_address.slice(0, 6)}…${agent.owner_address.slice(-4)}`
+                    : "—"}
+                </div>
+                <div>ENS: {agent.ens_name ?? "—"}</div>
+                <div>Created: {new Date(agent.created_at).toLocaleString()}</div>
+              </div>
+            </div>
+          ))}
         </section>
       )}
 
       <footer className="text-sm text-muted-foreground">
         <Link href="/" className="underline underline-offset-4">
-          Back to lobby
+          Back to arenas
         </Link>
       </footer>
     </main>

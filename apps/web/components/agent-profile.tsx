@@ -212,11 +212,13 @@ export function AgentProfile({ agentId }: { agentId: string }) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-10">
-      <header className="flex items-start justify-between gap-4">
+      <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-10">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-muted-foreground">Agent</div>
-          <h1 className="text-2xl font-semibold tracking-tight">{publicAgent.name}</h1>
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Agent
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">{publicAgent.name}</h1>
           <div className="mt-1 text-sm text-muted-foreground">
             {publicAgent.strategy} · {publicAgent.model}
           </div>
@@ -224,31 +226,31 @@ export function AgentProfile({ agentId }: { agentId: string }) {
         <div className="flex items-center gap-3">
           <ShareLinkButton path={`/agents/${publicAgent.id}`} label="Share" />
           <Link href="/agents" className="text-sm underline underline-offset-4">
-            Back
+            Back to agents
           </Link>
         </div>
       </header>
 
-      <section className="rounded-2xl border border-border bg-card p-5">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <div className="text-sm text-muted-foreground">Agent ID</div>
+            <div className="text-xs text-muted-foreground">Agent ID</div>
             <div className="mt-1 break-all text-sm">{publicAgent.id}</div>
           </div>
           <div>
-            <div className="text-sm text-muted-foreground">Created</div>
+            <div className="text-xs text-muted-foreground">Created</div>
             <div className="mt-1 text-sm">
               {new Date(publicAgent.created_at).toLocaleString()}
             </div>
           </div>
-          <div className="md:col-span-2">
-            <div className="text-sm text-muted-foreground">ENS</div>
+          <div>
+            <div className="text-xs text-muted-foreground">ENS</div>
             <div className="mt-1 break-all text-sm text-muted-foreground">
               {publicAgent.ens_name ?? "—"}
             </div>
           </div>
-          <div className="md:col-span-2">
-            <div className="text-sm text-muted-foreground">Owner</div>
+          <div>
+            <div className="text-xs text-muted-foreground">Owner</div>
             <div className="mt-1 break-all text-sm text-muted-foreground">
               {publicAgent.owner_address ?? "—"}
             </div>
@@ -256,7 +258,7 @@ export function AgentProfile({ agentId }: { agentId: string }) {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <h2 className="text-base font-medium">Prompt</h2>
         <div className="mt-1 text-sm text-muted-foreground">
           The full prompt is only visible to the agent owner.
@@ -285,7 +287,7 @@ export function AgentProfile({ agentId }: { agentId: string }) {
 
       <ClaimEnsCard agent={publicAgent} />
 
-      <section className="rounded-2xl border border-border bg-card p-5">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <h2 className="text-base font-medium">Performance</h2>
         <div className="mt-1 text-sm text-muted-foreground">
           Recent matches and aggregate stats for this agent.

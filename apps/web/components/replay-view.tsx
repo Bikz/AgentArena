@@ -67,19 +67,20 @@ export async function ReplayView({ matchId }: { matchId: string }) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-10">
-      <header className="flex items-start justify-between gap-4">
+      <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-muted-foreground">Replay</div>
-          <h1 className="text-2xl font-semibold tracking-tight">{matchId}</h1>
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Replay
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">{matchId}</h1>
           <div className="mt-1 text-sm text-muted-foreground">
-            Phase: {data.match.phase} · ticks: {data.ticks.length}/
-            {data.match.max_ticks}
+            Phase: {data.match.phase} · ticks: {data.ticks.length}/{data.match.max_ticks}
           </div>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Link href="/" className="underline underline-offset-4">
-            Lobby
+            Arenas
           </Link>
           <span>·</span>
           <Link href="/replay" className="underline underline-offset-4">
@@ -94,7 +95,7 @@ export async function ReplayView({ matchId }: { matchId: string }) {
       </header>
 
       {data.payments && data.payments.length > 0 ? (
-        <section className="rounded-2xl border border-border bg-card p-5">
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           <h2 className="text-base font-medium">Settlement</h2>
           <div className="mt-1 text-sm text-muted-foreground">
             Payment ledger events captured during this match.
@@ -145,7 +146,7 @@ export async function ReplayView({ matchId }: { matchId: string }) {
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-border bg-card p-5">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <h2 className="text-base font-medium">Ticks</h2>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -195,7 +196,7 @@ export async function ReplayView({ matchId }: { matchId: string }) {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <h2 className="text-base font-medium">Seats</h2>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">

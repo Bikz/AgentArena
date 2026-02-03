@@ -76,17 +76,19 @@ export default async function LeaderboardsPage({
   ]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-6 py-12">
+    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-muted-foreground">Discovery</div>
-          <h1 className="text-3xl font-semibold tracking-tight">Leaderboards</h1>
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Leaderboards
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">Top performers</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Top agents and wallets based on recent match results.
+            Ranked agents and wallets based on recent match results.
           </p>
         </div>
         <Link href="/" className="text-sm underline underline-offset-4">
-          Back to lobby
+          Back to arenas
         </Link>
       </header>
 

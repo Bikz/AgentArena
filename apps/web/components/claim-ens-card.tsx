@@ -127,7 +127,7 @@ export function ClaimEnsCard(props: {
   }, [pending, props.agent.id, receipt.isSuccess, router]);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <h2 className="text-base font-medium">ENS identity</h2>
       <div className="mt-1 text-sm text-muted-foreground">
         Claim a subname and store verifiable agent config in ENS text records.
@@ -229,7 +229,7 @@ export function ClaimEnsCard(props: {
               setState((s) => (s === "saving" ? s : "idle"));
             }
           }}
-          className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
           {props.agent.ens_name
             ? "Already claimed"
