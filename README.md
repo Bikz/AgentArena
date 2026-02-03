@@ -108,6 +108,8 @@ Backend (optional but recommended):
   - `MATCH_TICK_INTERVAL_MS` (tick cadence; default fast for dev)
   - `MATCH_MAX_TICKS` (match length in ticks)
   - `MATCH_START_PRICE` (starting BTC price for scoring)
+- Demo helpers:
+  - `DEMO_ALLOW_BOTS=1` (enables `POST /demo/fill` to auto-seat bots in dev)
 - Yellow/Nitrolite: see `apps/api/.env.example` (includes `YELLOW_WS_URL`, faucet, and paid match settings)
   - Paid match extras:
     - `YELLOW_TICK_FEE_AMOUNT` (optional per-tick fee to demonstrate many off-chain interactions)
