@@ -50,6 +50,16 @@ function Sparkline({ values }: { values: number[] }) {
   );
 }
 
+type FeedItem = {
+  tick: number;
+  price?: number;
+  leader?: {
+    name: string;
+    credits: number;
+    note?: string;
+  };
+};
+
 export function MatchView({ matchId }: { matchId: string }) {
   const onOpenSend = useMemo(
     () => [{ type: "subscribe" as const, v: 1 as const, matchId }],
@@ -88,6 +98,36 @@ export function MatchView({ matchId }: { matchId: string }) {
       .slice(0, 30)
       .reverse();
     return ticks.map((t) => t.btcPrice);
+  }, [events]);
+
+  const feedItems = useMemo(() => {
+    const priceByTick = new Map<number, number>();
+    for (const event of events) {
+      if (event.type !== "tick") continue;
+      priceByTick.set(event.tick.tick, event.tick.btcPrice);
+    }
+
+    const items: FeedItem[] = [];
+    const seen = new Set<number>();
+    for (const event of events) {
+      if (event.type !== "leaderboard") continue;
+      if (seen.has(event.tick)) continue;
+      seen.add(event.tick);
+      const top = [...event.rows].sort((a, b) => b.credits - a.credits)[0];
+      items.push({
+        tick: event.tick,
+        price: priceByTick.get(event.tick),
+        leader: top
+          ? {
+              name: top.agentName,
+              credits: top.credits,
+              note: top.note,
+            }
+          : undefined,
+      });
+      if (items.length >= 8) break;
+    }
+    return items;
   }, [events]);
 
   const countdown = useMemo(() => {
@@ -221,6 +261,47 @@ export function MatchView({ matchId }: { matchId: string }) {
                 ? "Waiting for leaderboard events…"
                 : "Connecting to live match…"}
             </div>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-base font-medium">Live feed</h2>
+          <div className="text-sm text-muted-foreground">
+            {feedItems.length > 0 ? `last ${feedItems.length} ticks` : "—"}
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3 text-sm">
+          {feedItems.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              Waiting for live match updates…
+            </div>
+          ) : (
+            feedItems.map((item) => (
+              <div
+                key={item.tick}
+                className="rounded-xl border border-border bg-background px-3 py-2"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Tick {item.tick}</span>
+                  <span>
+                    {item.price ? `$${item.price.toFixed(2)}` : "Price —"}
+                  </span>
+                </div>
+                <div className="mt-1 text-muted-foreground">
+                  {item.leader
+                    ? `${item.leader.name} leads · ${item.leader.credits.toFixed(2)} credits`
+                    : "Leader —"}
+                </div>
+                {item.leader?.note ? (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Note: {item.leader.note}
+                  </div>
+                ) : null}
+              </div>
+            ))
           )}
         </div>
       </section>

@@ -8,6 +8,7 @@ import { ConnectWalletButton } from "@/components/connect-wallet-button";
 import { useAuth } from "@/hooks/useAuth";
 
 type Strategy = "hold" | "random" | "trend" | "mean_revert";
+type QueueState = "idle" | "queued" | "seated";
 type Agent = {
   id: string;
   name: string;
@@ -44,6 +45,7 @@ export function Lobby() {
   } | null>(null);
   const [status, setStatus] = useState<{
     db: { configured: boolean };
+    ai?: { enabled: boolean };
     yellow: {
       configured: boolean;
       paidMatches: boolean;
@@ -57,6 +59,13 @@ export function Lobby() {
       houseAddress: string | null;
     };
   } | null>(null);
+  const [queueState, setQueueState] = useState<QueueState>("idle");
+  const [queuedAgent, setQueuedAgent] = useState<{
+    id?: string;
+    name: string;
+    strategy: Strategy;
+  } | null>(null);
+  const [seatedMatchId, setSeatedMatchId] = useState<string | null>(null);
   const [yellowReady, setYellowReady] = useState<boolean>(false);
 
   const { state, events, send } = useWsEvents();
@@ -212,7 +221,65 @@ export function Lobby() {
     state === "connected" &&
     (!!selectedAgent || hasManualAgent) &&
     auth.isSignedIn &&
-    (!paidMatches || yellowReady);
+    (!paidMatches || yellowReady) &&
+    queueState === "idle";
+
+  useEffect(() => {
+    if (!auth.isSignedIn) {
+      setQueueState("idle");
+      setQueuedAgent(null);
+      setSeatedMatchId(null);
+    }
+  }, [auth.isSignedIn]);
+
+  useEffect(() => {
+    if (state === "connected") return;
+    if (queueState === "queued") {
+      setQueueState("idle");
+      setQueuedAgent(null);
+      setSeatedMatchId(null);
+    }
+  }, [queueState, state]);
+
+  useEffect(() => {
+    if (!match || !queuedAgent) return;
+    const isSeated = match.seats.some((seat) =>
+      queuedAgent.id ? seat.agentId === queuedAgent.id : seat.agentName === queuedAgent.name,
+    );
+    if (isSeated) {
+      setQueueState("seated");
+      setSeatedMatchId(match.matchId);
+      return;
+    }
+    if (
+      queueState === "seated" &&
+      seatedMatchId === match.matchId &&
+      match.phase === "finished"
+    ) {
+      setQueueState("idle");
+      setQueuedAgent(null);
+      setSeatedMatchId(null);
+    }
+  }, [match, queuedAgent, queueState, seatedMatchId]);
+
+  useEffect(() => {
+    if (!latestError) return;
+    if (queueState !== "queued") return;
+    const retryableCodes = new Set([
+      "UNAUTHORIZED",
+      "YELLOW_NOT_READY",
+      "HOUSE_NOT_CONFIGURED",
+      "ENTRY_FEE_FAILED",
+      "AGENT_NOT_FOUND",
+      "FORBIDDEN",
+      "ALREADY_QUEUED",
+    ]);
+    if (retryableCodes.has(latestError.code)) {
+      setQueueState("idle");
+      setQueuedAgent(null);
+      setSeatedMatchId(null);
+    }
+  }, [latestError, queueState]);
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
@@ -302,6 +369,13 @@ export function Lobby() {
               agentName: selectedAgent.name,
               strategy: selectedAgent.strategy,
             });
+            setQueueState("queued");
+            setQueuedAgent({
+              id: selectedAgent.id,
+              name: selectedAgent.name,
+              strategy: selectedAgent.strategy,
+            });
+            setSeatedMatchId(null);
             return;
           }
           if (!hasManualAgent) return;
@@ -311,6 +385,12 @@ export function Lobby() {
             agentName: manualAgentName.trim(),
             strategy: manualStrategy,
           });
+          setQueueState("queued");
+          setQueuedAgent({
+            name: manualAgentName.trim(),
+            strategy: manualStrategy,
+          });
+          setSeatedMatchId(null);
         }}
       >
         {status ? (
@@ -320,6 +400,7 @@ export function Lobby() {
                 DB: {status.db.configured ? "on" : "off"} · Yellow:{" "}
                 {status.yellow.configured ? "on" : "off"}
               </span>
+              {status.ai ? <span>AI: {status.ai.enabled ? "on" : "off"}</span> : null}
               {status.onchain ? (
                 <span>On-chain: {status.onchain.enabled ? "on" : "off"}</span>
               ) : null}
@@ -424,14 +505,44 @@ export function Lobby() {
           </div>
         </div>
 
-        <div className="md:col-span-3 flex items-center justify-between">
-          <button
-            type="submit"
-            disabled={!canJoin}
-            className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          >
-            {paidMatches && !yellowReady ? "Enable Yellow to join" : "Join queue"}
-          </button>
+        <div className="md:col-span-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="submit"
+              disabled={!canJoin}
+              className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            >
+              {queueState === "queued"
+                ? "Queued"
+                : queueState === "seated"
+                  ? "Seated"
+                  : paidMatches && !yellowReady
+                    ? "Enable Yellow to join"
+                    : "Join queue"}
+            </button>
+            {queueState === "queued" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  send({ type: "leave_queue", v: 1 });
+                  setQueueState("idle");
+                  setQueuedAgent(null);
+                  setSeatedMatchId(null);
+                }}
+                className="rounded-xl border border-border bg-background px-4 py-2 text-sm text-foreground"
+              >
+                Leave queue
+              </button>
+            ) : null}
+          </div>
+
+          <div className="text-sm text-muted-foreground">
+            {queueState === "queued"
+              ? `Queued as ${queuedAgent?.name ?? "agent"} · waiting for seats.`
+              : queueState === "seated"
+                ? `Seated in ${seatedMatchId ?? "match"} · live updates below.`
+                : "Not queued."}
+          </div>
 
           {match ? (
             <div className="flex items-center gap-3">
