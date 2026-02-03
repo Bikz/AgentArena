@@ -48,6 +48,7 @@ import {
 type WsRawData = string | Buffer | ArrayBuffer | Buffer[];
 type WsClient = {
   id: string;
+  label?: string;
   send: (data: string) => void;
   close: () => void;
   matchId?: string;
@@ -174,6 +175,10 @@ const buildPerformanceResponse = (
 };
 
 export function buildApp() {
+  if (process.env.NODE_ENV === "production" && !process.env.SIWE_DOMAIN) {
+    throw new Error("SIWE_DOMAIN is required in production");
+  }
+
   const app = Fastify({
     logger: {
       transport:
@@ -455,6 +460,9 @@ export function buildApp() {
       }
 
       const domain = process.env.SIWE_DOMAIN;
+      if (domain && siwe.domain !== domain) {
+        return reply.code(401).send({ error: "invalid_domain" as const });
+      }
       const scheme = process.env.SIWE_SCHEME;
       const res = await siwe
         .verify(
@@ -738,6 +746,7 @@ export function buildApp() {
         ensNode: req.body.ensNode,
         txHash: req.body.txHash,
       });
+      invalidateAgentCache(agent.id);
       return { ok: true as const };
     },
   );
@@ -790,6 +799,13 @@ export function buildApp() {
 
   const wsClients = new Map<string, WsClient>();
   const wsActionBuckets = new Map<string, { windowStartMs: number; count: number }>();
+  const clearWsBuckets = (clientId: string) => {
+    for (const key of wsActionBuckets.keys()) {
+      if (key.startsWith(`${clientId}:`)) {
+        wsActionBuckets.delete(key);
+      }
+    }
+  };
   const wsAllowAction = (clientId: string, action: WsAction) => {
     const limits: Record<WsAction, { max: number; windowMs: number }> = {
       subscribe: { max: 10, windowMs: 10_000 },
@@ -816,7 +832,15 @@ export function buildApp() {
       return;
     }
     const payload = JSON.stringify(parsed.data);
-    for (const client of wsClients.values()) client.send(payload);
+    for (const [clientId, client] of wsClients.entries()) {
+      try {
+        client.send(payload);
+      } catch (err) {
+        app.log.warn({ err, clientId }, "ws send failed");
+        wsClients.delete(clientId);
+        clearWsBuckets(clientId);
+      }
+    }
   };
 
   const broadcastToMatch = (matchId: string, event: unknown) => {
@@ -826,18 +850,50 @@ export function buildApp() {
       return;
     }
     const payload = JSON.stringify(parsed.data);
-    for (const client of wsClients.values()) {
-      if (client.matchId === matchId) client.send(payload);
+    for (const [clientId, client] of wsClients.entries()) {
+      if (client.matchId !== matchId) continue;
+      try {
+        client.send(payload);
+      } catch (err) {
+        app.log.warn({ err, clientId }, "ws send failed");
+        wsClients.delete(clientId);
+        clearWsBuckets(clientId);
+      }
     }
   };
 
-  const agentCache = new Map<string, Awaited<ReturnType<typeof getAgent>>>();
+  const agentCache = new Map<
+    string,
+    { value: Awaited<ReturnType<typeof getAgent>>; expiresAt: number }
+  >();
+  const agentCacheTtlMs = Number(process.env.AGENT_CACHE_TTL_MS ?? "60000");
+  const getCachedAgent = (agentId: string) => {
+    const cached = agentCache.get(agentId);
+    if (!cached) return null;
+    if (Date.now() > cached.expiresAt) {
+      agentCache.delete(agentId);
+      return null;
+    }
+    return cached.value;
+  };
+  const setCachedAgent = (
+    agentId: string,
+    agent: Awaited<ReturnType<typeof getAgent>>,
+  ) => {
+    agentCache.set(agentId, {
+      value: agent,
+      expiresAt: Date.now() + Math.max(0, agentCacheTtlMs),
+    });
+  };
+  const invalidateAgentCache = (agentId: string) => {
+    agentCache.delete(agentId);
+  };
   const resolveAgent = async (agentId: string) => {
     if (!pool) return null;
-    const cached = agentCache.get(agentId);
+    const cached = getCachedAgent(agentId);
     if (cached) return cached;
     const agent = await getAgent(pool, agentId);
-    if (agent) agentCache.set(agentId, agent);
+    if (agent) setCachedAgent(agentId, agent);
     return agent;
   };
 
@@ -1206,12 +1262,14 @@ export function buildApp() {
       },
       (socket, req) => {
         const query = req.query as { clientId?: string };
-        const clientId = query.clientId ?? "anon";
+        const clientLabel = query.clientId ?? "anon";
+        const clientId = `ws-${crypto.randomUUID()}`;
         const address = (req.session as any).get("address") as string | undefined;
-        req.log.info({ clientId }, "ws connected");
+        req.log.info({ clientId: clientLabel, clientKey: clientId }, "ws connected");
 
         const client: WsClient = {
           id: clientId,
+          label: clientLabel,
           address,
           send: (data: string) => socket.send(data),
           close: () => socket.close(),
@@ -1480,8 +1538,9 @@ export function buildApp() {
         });
 
         socket.on("close", () => {
-          req.log.info({ clientId }, "ws disconnected");
+          req.log.info({ clientId: client.label ?? clientId }, "ws disconnected");
           wsClients.delete(clientId);
+          clearWsBuckets(clientId);
           const pending = pendingEntryByClientId.get(clientId);
           engine.leaveQueue(clientId);
           if (paidMatches && pending) {
