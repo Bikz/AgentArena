@@ -114,6 +114,13 @@ Backend (optional but recommended):
     - `YELLOW_QUEUE_REFUND_MS` (auto-refund entry fees if queue doesn’t fill)
   - Persistence (recommended for prod):
     - `YELLOW_SESSION_STORE_KEY_BASE64` (encrypt-at-rest key for persisted Yellow sessions)
+  - On-chain settlement (optional):
+    - `ONCHAIN_SETTLEMENT_ENABLED=1`
+    - `ONCHAIN_RPC_URL` (EVM RPC endpoint)
+    - `ONCHAIN_TOKEN_ADDRESS` (ERC-20 used for payout)
+    - `ONCHAIN_SETTLEMENT_CONTRACT` (deployed `MatchSettlementEscrow`)
+    - `ONCHAIN_HOUSE_PRIVATE_KEY` (owner key that funds + settles)
+    - `ONCHAIN_RAKE_BPS` / `ONCHAIN_RAKE_RECIPIENT` (optional overrides)
 
 ENS (web, optional for now):
 - `NEXT_PUBLIC_ENS_REGISTRAR_ADDRESS` (deployed `AgentArenaSubnameRegistrar` address)
