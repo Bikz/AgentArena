@@ -8,10 +8,10 @@ describe("GET /status", () => {
     expect(res.statusCode).toBe(200);
     const json = res.json() as any;
     expect(typeof json.db?.configured).toBe("boolean");
+    expect(typeof json.ai?.enabled).toBe("boolean");
     expect(typeof json.yellow?.paidMatches).toBe("boolean");
     expect(typeof json.yellow?.houseConfigured).toBe("boolean");
     expect(typeof json.yellow?.sessionPersistence).toBe("boolean");
     await app.close();
   });
 });
-

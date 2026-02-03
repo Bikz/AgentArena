@@ -311,6 +311,7 @@ export function buildApp() {
   app.get("/health", async () => ({ ok: true as const }));
   app.get("/status", async () => ({
     db: { configured: Boolean(pool) },
+    ai: { enabled: Boolean(process.env.AI_GATEWAY_API_KEY) },
     auth: {
       siwe: {
         domain: process.env.SIWE_DOMAIN ?? null,
