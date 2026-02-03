@@ -3,6 +3,14 @@ import { ServerEventSchema } from "@agent-arena/shared";
 import { buildApp } from "../src/app.js";
 import { privateKeyToAccount } from "viem/accounts";
 
+const TEST_KEYS = [
+  "0x073c58734624515f5b74a35150b22037865aa1b97c0b31f818656619471e5b82",
+  "0xce3007bb649d054f9fa7405a0804b161e0e691ba2649d0f555993f02b0184d54",
+  "0x629d8ac3128174827cf0ee76c4e6db2aa68737643cb522efd46accb6b4057cdd",
+  "0x54e94b5801bb6bbeebf797e7efe2376f0ab3283acfc4b3f44c48f7e0c429c309",
+  "0x15fbbf4e3b8c880f3c0bd115142865cbe038bdb62b465e77a48bcf2c835fb08d",
+] as const;
+
 async function waitFor<T>(
   fn: () => T | undefined,
   { timeoutMs }: { timeoutMs: number },
@@ -28,34 +36,39 @@ describe("ws e2e", () => {
     const app = buildApp();
     await app.ready();
 
-    // Authenticate once, reuse the session cookie for all clients (localhost cookies ignore port).
-    const nonceRes = await app.inject({ method: "POST", url: "/auth/nonce" });
-    const nonceCookie = getSetCookie(nonceRes.headers as any);
-    if (!nonceCookie) throw new Error("missing nonce cookie");
+    const signIn = async (privateKey: `0x${string}`) => {
+      const nonceRes = await app.inject({ method: "POST", url: "/auth/nonce" });
+      const nonceCookie = getSetCookie(nonceRes.headers as any);
+      if (!nonceCookie) throw new Error("missing nonce cookie");
 
-    const { nonce } = nonceRes.json() as { nonce: string };
-    const account = privateKeyToAccount(
-      "0x59c6995e998f97a5a0044966f094538eeb94b3f5f2b2c3a8d9b8b8b8b8b8b8b8",
-    );
-    const message =
-      `agentarena.local wants you to sign in with your Ethereum account:\n` +
-      `${account.address}\n\n` +
-      `Sign in to Agent Arena.\n\n` +
-      `URI: http://agentarena.local\n` +
-      `Version: 1\n` +
-      `Chain ID: 1\n` +
-      `Nonce: ${nonce}\n` +
-      `Issued At: 2026-01-31T00:00:00.000Z`;
-    const signature = await account.signMessage({ message });
+      const { nonce } = nonceRes.json() as { nonce: string };
+      const account = privateKeyToAccount(privateKey);
+      const message =
+        `agentarena.local wants you to sign in with your Ethereum account:\n` +
+        `${account.address}\n\n` +
+        `Sign in to Agent Arena.\n\n` +
+        `URI: http://agentarena.local\n` +
+        `Version: 1\n` +
+        `Chain ID: 1\n` +
+        `Nonce: ${nonce}\n` +
+        `Issued At: 2026-01-31T00:00:00.000Z`;
+      const signature = await account.signMessage({ message });
 
-    const verifyRes = await app.inject({
-      method: "POST",
-      url: "/auth/verify",
-      headers: { cookie: nonceCookie },
-      payload: { message, signature },
-    });
-    const authedCookie = getSetCookie(verifyRes.headers as any);
-    if (!authedCookie) throw new Error("missing auth cookie");
+      const verifyRes = await app.inject({
+        method: "POST",
+        url: "/auth/verify",
+        headers: { cookie: nonceCookie },
+        payload: { message, signature },
+      });
+      const authedCookie = getSetCookie(verifyRes.headers as any);
+      if (!authedCookie) throw new Error("missing auth cookie");
+      return authedCookie;
+    };
+
+    const cookies: string[] = [];
+    for (const key of TEST_KEYS) {
+      cookies.push(await signIn(key));
+    }
 
     const sockets: Array<{
       send: (data: string) => void;
@@ -68,7 +81,7 @@ describe("ws e2e", () => {
       const clientId = `test-${i + 1}`;
       const socket = (await (app as any).injectWS(
         `/ws?clientId=${clientId}`,
-        { headers: { cookie: authedCookie } },
+        { headers: { cookie: cookies[i]! } },
         {
           onOpen: (ws: {
             on: (event: string, cb: (data: unknown) => void) => void;
