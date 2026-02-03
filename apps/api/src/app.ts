@@ -38,6 +38,12 @@ import { YellowService } from "./yellow/yellow.js";
 import { OnchainSettlementService } from "./onchain/settlement.js";
 import { EIP712AuthTypes } from "@erc7824/nitrolite";
 import { SiweMessage } from "siwe";
+import {
+  metricsContentType,
+  observeHttpRequest,
+  renderMetrics,
+  updateRuntimeMetrics,
+} from "./metrics.js";
 
 type WsRawData = string | Buffer | ArrayBuffer | Buffer[];
 type WsClient = {
@@ -209,6 +215,30 @@ export function buildApp() {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     },
+  });
+
+  app.addHook("onRequest", (req, _reply, done) => {
+    (req as any).__startAt = process.hrtime.bigint();
+    done();
+  });
+
+  app.addHook("onResponse", (req, reply, done) => {
+    const start = (req as any).__startAt as bigint | undefined;
+    if (start) {
+      const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+      const route =
+        (req as any).routerPath ??
+        (req as any).routeOptions?.url ??
+        req.url ??
+        "unknown";
+      observeHttpRequest({
+        method: req.method,
+        route,
+        status: reply.statusCode,
+        durationMs,
+      });
+    }
+    done();
   });
 
   const pool = createPool();
@@ -1125,6 +1155,17 @@ export function buildApp() {
     queue: { size: engine.getQueueSize() },
     matches: engine.getMatchCounts(),
   }));
+
+  app.get("/metrics/prom", async (_req, reply) => {
+    updateRuntimeMetrics({
+      wsConnections: wsClients.size,
+      queueSize: engine.getQueueSize(),
+      matches: engine.getMatchCounts(),
+    });
+    const body = await renderMetrics();
+    reply.type(metricsContentType());
+    return body;
+  });
 
   if (paidMatches && queueRefundMs > 0) {
     queueRefundInterval = setInterval(() => {

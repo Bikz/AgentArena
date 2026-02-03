@@ -143,6 +143,7 @@ Agent creation is tied to a wallet address. In the UI:
 - `GET /health` — liveness
 - `GET /status` — config and integration readiness
 - `GET /metrics` — basic runtime counters (queue, matches, WS connections)
+- `GET /metrics/prom` — Prometheus text format (HTTP + runtime metrics)
 
 ## Status
 

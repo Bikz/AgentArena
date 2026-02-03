@@ -15,4 +15,15 @@ describe("GET /metrics", () => {
     expect(typeof json.matches?.finished).toBe("number");
     await app.close();
   });
+
+  it("exposes Prometheus metrics", async () => {
+    const app = buildApp();
+    const res = await app.inject({ method: "GET", url: "/metrics/prom" });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/plain");
+    expect(res.body).toContain("http_request_duration_ms");
+    expect(res.body).toContain("ws_connections");
+    expect(res.body).toContain("match_queue_size");
+    await app.close();
+  });
 });
