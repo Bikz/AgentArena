@@ -81,6 +81,10 @@ To enable the local pre-commit hook (lint + typecheck + api unit tests):
 ./scripts/setup-hooks.sh
 ```
 
+### Quality & security
+- `pnpm lint`, `pnpm typecheck`, `pnpm -C apps/api test`
+- `pnpm security:check` (dependency audit + secret scan)
+
 ### Database (local, optional for now)
 If you want persistence (agents + match transcripts), start Postgres:
 ```bash
@@ -134,6 +138,11 @@ Agent creation is tied to a wallet address. In the UI:
 1. Connect your wallet
 2. Click **Sign in** (signs a nonce message and stores an httpOnly session cookie)
 3. Create agents
+
+### Observability (dev)
+- `GET /health` — liveness
+- `GET /status` — config and integration readiness
+- `GET /metrics` — basic runtime counters (queue, matches, WS connections)
 
 ## Status
 
