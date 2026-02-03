@@ -123,114 +123,76 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>BTC Arena · Blitz</span>
-            <span
-              className={`rounded-full px-2 py-1 ${
-                activeMatch
-                  ? "bg-emerald-500/15 text-emerald-600"
-                  : "bg-muted/40 text-muted-foreground"
-              }`}
-            >
-              {activeMatch ? "Live" : "Waiting"}
-            </span>
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-xs text-muted-foreground">BTC Arena · Blitz</div>
+            <div className="mt-2 text-lg font-semibold">Live strategy match</div>
           </div>
-          <div className="mt-3 text-lg font-semibold">Live strategy match</div>
-          <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
-            <div>Seats: 5 agents</div>
-            <div>
-              Tick: {config?.match ? Math.round(config.match.tickIntervalMs / 1000) : "—"}s ·
-              {` `}
-              {config?.match?.maxTicks ?? "—"} ticks
-            </div>
-            <div>Entry: {entryLabel}</div>
-          </div>
-          <div className="mt-4 flex items-center gap-3 text-sm">
-            {activeMatch ? (
-              <Link
-                href={`/match/${activeMatch.id}`}
-                className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
-              >
-                View live
-              </Link>
-            ) : (
-              <Link
-                href="#join-queue"
-                className="rounded-full border border-border px-4 py-2 text-foreground"
-              >
-                Join next round
-              </Link>
-            )}
-            <Link href="/replay" className="underline underline-offset-4">
-              Browse replays
-            </Link>
-          </div>
+          <span
+            className={`rounded-full px-2 py-1 text-xs ${
+              activeMatch
+                ? "bg-emerald-500/15 text-emerald-600"
+                : "bg-muted/40 text-muted-foreground"
+            }`}
+          >
+            {activeMatch ? "Live" : "Waiting"}
+          </span>
         </div>
-
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="text-xs text-muted-foreground">Next round</div>
-          <div className="mt-2 text-lg font-semibold">Queue opens at 5 agents</div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Seats fill fast. Join the queue and the match starts immediately when
-            five agents are seated.
-          </p>
-          <div className="mt-4 flex items-center gap-3 text-sm">
+        <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+          <div>Seats: 5 agents</div>
+          <div>
+            Tick: {config?.match ? Math.round(config.match.tickIntervalMs / 1000) : "—"}s ·
+            {` `}
+            {config?.match?.maxTicks ?? "—"} ticks
+          </div>
+          <div>Entry: {entryLabel}</div>
+          <div>Settlement: Yellow session</div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+          {activeMatch ? (
+            <Link
+              href={`/match/${activeMatch.id}`}
+              className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
+            >
+              View live
+            </Link>
+          ) : (
             <Link
               href="#join-queue"
-              className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
+              className="rounded-full border border-border px-4 py-2 text-foreground"
             >
-              Join queue
+              Join next round
             </Link>
-            <Link href="/agents" className="rounded-full border border-border px-4 py-2">
-              Pick agent
-            </Link>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="text-xs text-muted-foreground">Replays</div>
-          <div className="mt-2 text-lg font-semibold">Best recent matchups</div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Watch recent matches tick-by-tick and learn how top agents win.
-          </p>
-          <div className="mt-4 flex items-center gap-3 text-sm">
-            <Link
-              href="/replay"
-              className="rounded-full bg-primary px-4 py-2 text-primary-foreground"
-            >
-              View replays
-            </Link>
-          </div>
+          )}
+          <Link href="/replay" className="underline underline-offset-4">
+            Browse replays
+          </Link>
         </div>
       </section>
 
-      <section
-        id="how-it-works"
-        className="rounded-2xl border border-border bg-card p-6 shadow-sm"
-      >
+      <section id="how-it-works" className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
           How it works
         </div>
-        <div className="mt-2 text-lg font-semibold">One match, many off-chain ticks</div>
+        <div className="mt-2 text-lg font-semibold">Seat → tick → settle</div>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <div className="rounded-xl border border-border bg-background p-4">
-            <div className="text-sm font-medium">1. Seat your agent</div>
+            <div className="text-sm font-medium">Seat an agent</div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Join the queue with a registered agent. Matches start at 5 seats.
+              Join the queue and wait for five seats.
             </p>
           </div>
           <div className="rounded-xl border border-border bg-background p-4">
-            <div className="text-sm font-medium">2. Play live ticks</div>
+            <div className="text-sm font-medium">Live ticks</div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Each tick updates off-chain instantly via Yellow session channels.
+              Decisions settle off-chain every tick.
             </p>
           </div>
           <div className="rounded-xl border border-border bg-background p-4">
-            <div className="text-sm font-medium">3. Settle once</div>
+            <div className="text-sm font-medium">One settlement</div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Final balances settle on-chain when the match ends.
+              Final balances settle on-chain once.
             </p>
           </div>
         </div>
@@ -354,24 +316,6 @@ export default async function HomePage() {
 
         <aside className="flex flex-col gap-4" id="join-queue">
           <Lobby />
-
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="text-sm text-muted-foreground">Quick actions</div>
-            <div className="mt-3 flex flex-col gap-2 text-sm">
-              <Link
-                href="/agents/new"
-                className="rounded-full bg-primary px-4 py-2 text-center text-primary-foreground"
-              >
-                Create agent
-              </Link>
-              <Link
-                href="/agents"
-                className="rounded-full border border-border px-4 py-2 text-center text-foreground"
-              >
-                View agents
-              </Link>
-            </div>
-          </div>
 
           <YellowCard />
         </aside>
