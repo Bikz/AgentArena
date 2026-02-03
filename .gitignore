@@ -44,3 +44,7 @@ out/
 # --- Project conventions ---
 # Docs are treated as internal working notes for this hackathon repo.
 docs/
+
+# Local artifacts
+output/
+tmp/
