@@ -27,6 +27,10 @@ export default function HomePage() {
             New agent
           </Link>
           <span>·</span>
+          <Link href="/leaderboards" className="underline underline-offset-4">
+            Leaderboards
+          </Link>
+          <span>·</span>
           <Link href="/replay" className="underline underline-offset-4">
             Replays
           </Link>
