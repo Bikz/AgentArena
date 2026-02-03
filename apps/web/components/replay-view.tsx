@@ -19,12 +19,13 @@ type ReplayData = {
     id: number;
     created_at: string;
     match_id: string | null;
-    kind: "entry" | "refund" | "payout" | "tick_fees";
+    kind: "entry" | "refund" | "payout" | "tick_fees" | "onchain_fund" | "onchain_settlement";
     asset: string;
     amount: string;
     from_wallet: string | null;
     to_wallet: string | null;
     client_id: string | null;
+    tx?: { hash?: string } | null;
   }>;
   ticks: Array<{
     tick: number;
@@ -105,6 +106,7 @@ export async function ReplayView({ matchId }: { matchId: string }) {
                   <th className="py-2 pr-4 font-medium">Amount</th>
                   <th className="py-2 pr-4 font-medium">From</th>
                   <th className="py-2 pr-4 font-medium">To</th>
+                  <th className="py-2 pr-4 font-medium">Tx</th>
                   <th className="py-2 pr-4 font-medium">Time</th>
                 </tr>
               </thead>
@@ -123,6 +125,11 @@ export async function ReplayView({ matchId }: { matchId: string }) {
                     <td className="py-2 pr-4 text-muted-foreground">
                       {p.to_wallet
                         ? `${p.to_wallet.slice(0, 6)}…${p.to_wallet.slice(-4)}`
+                        : "—"}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {p.tx && (p as any).tx?.hash
+                        ? `${(p as any).tx.hash.slice(0, 6)}…${(p as any).tx.hash.slice(-4)}`
                         : "—"}
                     </td>
                     <td className="py-2 pr-4 text-muted-foreground">

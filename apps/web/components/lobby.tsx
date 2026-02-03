@@ -36,6 +36,12 @@ export function Lobby() {
     maxTicks: number;
     startPrice: number;
   } | null>(null);
+  const [onchainConfig, setOnchainConfig] = useState<{
+    enabled: boolean;
+    token: string | null;
+    contract: string | null;
+    rakeBps: number | null;
+  } | null>(null);
   const [status, setStatus] = useState<{
     db: { configured: boolean };
     yellow: {
@@ -43,6 +49,12 @@ export function Lobby() {
       paidMatches: boolean;
       houseConfigured: boolean;
       sessionPersistence: boolean;
+    };
+    onchain?: {
+      enabled: boolean;
+      contractAddress: string | null;
+      tokenAddress: string | null;
+      houseAddress: string | null;
     };
   } | null>(null);
   const [yellowReady, setYellowReady] = useState<boolean>(false);
@@ -63,12 +75,19 @@ export function Lobby() {
           entry: { asset: string; amount: string };
           tickFee?: { asset: string; amount: string };
           match?: { tickIntervalMs: number; maxTicks: number; startPrice: number };
+          onchain?: {
+            enabled: boolean;
+            token: string | null;
+            contract: string | null;
+            rakeBps: number | null;
+          };
         };
         if (cancelled) return;
         setPaidMatches(Boolean(json.paidMatches));
         setEntry(json.entry ?? null);
         setTickFee(json.tickFee ?? null);
         setMatchConfig(json.match ?? null);
+        setOnchainConfig(json.onchain ?? null);
       } catch {
         // ignore
       }
@@ -216,6 +235,11 @@ export function Lobby() {
               {Number(matchConfig.startPrice).toLocaleString()}
             </div>
           ) : null}
+          {onchainConfig?.enabled ? (
+            <div className="text-sm text-muted-foreground">
+              On-chain settlement enabled · Token: {onchainConfig.token ?? "erc20"}
+            </div>
+          ) : null}
           {paidMatches && tickFee && tickFee.amount !== "0" ? (
             <div className="text-sm text-muted-foreground">
               Tick fee (per seat per tick): {tickFee.amount} {tickFee.asset} (base units)
@@ -296,6 +320,9 @@ export function Lobby() {
                 DB: {status.db.configured ? "on" : "off"} · Yellow:{" "}
                 {status.yellow.configured ? "on" : "off"}
               </span>
+              {status.onchain ? (
+                <span>On-chain: {status.onchain.enabled ? "on" : "off"}</span>
+              ) : null}
               {status.yellow.paidMatches && !status.yellow.houseConfigured ? (
                 <span className="text-destructive-foreground/80">
                   Paid matches misconfigured: missing house wallet.
