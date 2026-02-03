@@ -91,6 +91,9 @@ export default async function HomePage() {
   const entryLabel = config?.paidMatches
     ? `${config.entry.amount} ${config.entry.asset}`
     : "Free";
+  const activeProgress = activeMatch
+    ? Math.min(100, Math.round((activeMatch.tick_count / activeMatch.max_ticks) * 100))
+    : 0;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-10">
@@ -149,6 +152,22 @@ export default async function HomePage() {
           <div>Entry: {entryLabel}</div>
           <div>Settlement: Yellow session</div>
         </div>
+        {activeMatch ? (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Tick progress {activeMatch.tick_count}/{activeMatch.max_ticks}
+              </span>
+              <span>{activeProgress}%</span>
+            </div>
+            <div className="mt-2 h-1.5 w-full rounded-full bg-muted/40">
+              <div
+                className="h-full rounded-full bg-emerald-500/70"
+                style={{ width: `${activeProgress}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
         <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
           {activeMatch ? (
             <Link
@@ -217,6 +236,10 @@ export default async function HomePage() {
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {recentMatches.map((match) => {
                   const isLive = match.phase !== "finished";
+                  const progress = Math.min(
+                    100,
+                    Math.round((match.tick_count / match.max_ticks) * 100),
+                  );
                   return (
                     <div
                       key={match.id}
@@ -237,8 +260,24 @@ export default async function HomePage() {
                       <div className="mt-2 text-sm font-semibold">
                         {match.id.replace("match_", "match ")}
                       </div>
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>
+                            {match.tick_count}/{match.max_ticks} ticks
+                          </span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full rounded-full bg-muted/40">
+                          <div
+                            className={`h-full rounded-full ${
+                              isLive ? "bg-emerald-500/70" : "bg-muted-foreground/40"
+                            }`}
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
                       <div className="mt-2 text-xs text-muted-foreground">
-                        {match.tick_count}/{match.max_ticks} ticks ·{" "}
+                        Seats: {match.seat_count} ·{" "}
                         {new Date(match.created_at).toLocaleString()}
                       </div>
                       <Link

@@ -12,6 +12,20 @@ type Agent = {
   ens_name?: string | null;
 };
 
+function initialsFrom(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "AA";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]!.slice(0, 1)}${parts[1]!.slice(0, 1)}`.toUpperCase();
+}
+
+const STRATEGY_LABELS: Record<Agent["strategy"], string> = {
+  hold: "Hold",
+  random: "Random",
+  trend: "Trend",
+  mean_revert: "Mean revert",
+};
+
 async function fetchAgents(): Promise<Agent[] | null> {
   const res = await fetch(`${apiBaseHttp()}/agents`, { cache: "no-store" });
   if (!res.ok) return null;
@@ -62,23 +76,35 @@ export default async function AgentsPage() {
           {agents.map((agent) => (
             <div key={agent.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs text-muted-foreground">Agent</div>
-                  <Link
-                    href={`/agents/${agent.id}`}
-                    className="mt-1 block text-base font-semibold underline-offset-4 hover:underline"
-                  >
-                    {agent.name}
-                  </Link>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {agent.strategy} · {agent.model}
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 text-xs font-semibold text-foreground">
+                    {initialsFrom(agent.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs text-muted-foreground">Agent</div>
+                    <Link
+                      href={`/agents/${agent.id}`}
+                      className="mt-1 block truncate text-base font-semibold underline-offset-4 hover:underline"
+                    >
+                      {agent.name}
+                    </Link>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5">
+                        {STRATEGY_LABELS[agent.strategy]}
+                      </span>
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5">
+                        {agent.model}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                {agent.ens_name ? (
-                  <span className="rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
-                    ENS
-                  </span>
-                ) : null}
+                <div className="flex flex-col items-end gap-2">
+                  {agent.ens_name ? (
+                    <span className="rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                      ENS
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
                 <div>

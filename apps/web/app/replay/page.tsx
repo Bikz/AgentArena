@@ -53,6 +53,10 @@ export default async function ReplaysIndexPage() {
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {matches.map((match) => {
             const isLive = match.phase !== "finished";
+            const progress = Math.min(
+              100,
+              Math.round((match.tick_count / match.max_ticks) * 100),
+            );
             return (
               <div
                 key={match.id}
@@ -71,11 +75,26 @@ export default async function ReplaysIndexPage() {
                   </span>
                 </div>
                 <div className="mt-3 text-sm font-semibold">{match.id}</div>
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>
+                      {match.tick_count}/{match.max_ticks} ticks
+                    </span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full rounded-full bg-muted/40">
+                    <div
+                      className={`h-full rounded-full ${
+                        isLive ? "bg-emerald-500/70" : "bg-muted-foreground/40"
+                      }`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
                 <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
                   <div>
-                    Ticks: {match.tick_count}/{match.max_ticks}
+                    Seats: {match.seat_count}
                   </div>
-                  <div>Seats: {match.seat_count}</div>
                   <div>{new Date(match.created_at).toLocaleString()}</div>
                 </div>
                 <div className="mt-4 flex items-center gap-3 text-sm">
