@@ -20,26 +20,60 @@ type PlayerLeader = {
   bestCredits: number | null;
 };
 
-async function fetchAgentLeaders() {
-  const res = await fetch(
-    `${apiBaseHttp()}/leaderboards/agents?limit=20&minMatches=1`,
-    { cache: "no-store" },
-  );
+function buildLeaderboardUrl(path: string, params: { sinceDays?: number | null; minMatches: number }) {
+  const url = new URL(`${apiBaseHttp()}${path}`);
+  url.searchParams.set("limit", "20");
+  url.searchParams.set("minMatches", String(params.minMatches));
+  if (params.sinceDays) {
+    url.searchParams.set("sinceDays", String(params.sinceDays));
+  }
+  return url.toString();
+}
+
+async function fetchAgentLeaders(params: { sinceDays?: number | null; minMatches: number }) {
+  const res = await fetch(buildLeaderboardUrl("/leaderboards/agents", params), {
+    cache: "no-store",
+  });
   if (!res.ok) return null;
   return (await res.json()) as { updatedAt: string; leaders: AgentLeader[] };
 }
 
-async function fetchPlayerLeaders() {
-  const res = await fetch(
-    `${apiBaseHttp()}/leaderboards/players?limit=20&minMatches=1`,
-    { cache: "no-store" },
-  );
+async function fetchPlayerLeaders(params: { sinceDays?: number | null; minMatches: number }) {
+  const res = await fetch(buildLeaderboardUrl("/leaderboards/players", params), {
+    cache: "no-store",
+  });
   if (!res.ok) return null;
   return (await res.json()) as { updatedAt: string; leaders: PlayerLeader[] };
 }
 
-export default async function LeaderboardsPage() {
-  const [agents, players] = await Promise.all([fetchAgentLeaders(), fetchPlayerLeaders()]);
+const WINDOW_OPTIONS = [
+  { label: "All time", value: "all", days: null },
+  { label: "30d", value: "30d", days: 30 },
+  { label: "7d", value: "7d", days: 7 },
+];
+const MATCH_OPTIONS = [
+  { label: "1+", value: "1", minMatches: 1 },
+  { label: "3+", value: "3", minMatches: 3 },
+  { label: "5+", value: "5", minMatches: 5 },
+];
+
+export default async function LeaderboardsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ window?: string; min?: string }>;
+}) {
+  const params = await searchParams;
+  const windowValue = params.window ?? "all";
+  const minValue = params.min ?? "1";
+  const windowOption =
+    WINDOW_OPTIONS.find((opt) => opt.value === windowValue) ?? WINDOW_OPTIONS[0];
+  const matchOption =
+    MATCH_OPTIONS.find((opt) => opt.value === minValue) ?? MATCH_OPTIONS[0];
+
+  const [agents, players] = await Promise.all([
+    fetchAgentLeaders({ sinceDays: windowOption.days, minMatches: matchOption.minMatches }),
+    fetchPlayerLeaders({ sinceDays: windowOption.days, minMatches: matchOption.minMatches }),
+  ]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-6 py-12">
@@ -55,6 +89,53 @@ export default async function LeaderboardsPage() {
           Back to lobby
         </Link>
       </header>
+
+      <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-wide">Window</span>
+          <div className="flex flex-wrap gap-2">
+            {WINDOW_OPTIONS.map((opt) => {
+              const active = opt.value === windowOption.value;
+              return (
+                <Link
+                  key={opt.value}
+                  href={`/leaderboards?window=${opt.value}&min=${matchOption.value}`}
+                  className={`rounded-full border px-3 py-1 text-xs ${
+                    active
+                      ? "border-primary text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {opt.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-wide">Min matches</span>
+          <div className="flex flex-wrap gap-2">
+            {MATCH_OPTIONS.map((opt) => {
+              const active = opt.value === matchOption.value;
+              return (
+                <Link
+                  key={opt.value}
+                  href={`/leaderboards?window=${windowOption.value}&min=${opt.value}`}
+                  className={`rounded-full border px-3 py-1 text-xs ${
+                    active
+                      ? "border-primary text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {opt.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-border bg-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -89,7 +170,12 @@ export default async function LeaderboardsPage() {
               </thead>
               <tbody>
                 {agents.leaders.map((leader) => (
-                  <tr key={leader.id} className="border-t border-border">
+                  <tr
+                    key={leader.id}
+                    className={`border-t border-border ${
+                      leader === agents.leaders[0] ? "bg-muted/20" : ""
+                    }`}
+                  >
                     <td className="py-2 pr-4">
                       <Link
                         href={`/agents/${leader.id}`}
@@ -150,7 +236,12 @@ export default async function LeaderboardsPage() {
               </thead>
               <tbody>
                 {players.leaders.map((leader) => (
-                  <tr key={leader.address} className="border-t border-border">
+                  <tr
+                    key={leader.address}
+                    className={`border-t border-border ${
+                      leader === players.leaders[0] ? "bg-muted/20" : ""
+                    }`}
+                  >
                     <td className="py-2 pr-4">
                       <Link
                         href={`/players/${leader.address}`}
