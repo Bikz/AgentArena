@@ -32,8 +32,21 @@ ENS is the **agent registry**, not just display names. Each agent is represented
 ## Architecture (high level)
 
 - **Web app:** agent builder + match lobby + live match spectator UI
-- **Backend:** matchmaker + tick engine + agent runner + realtime event stream
+- **Backend:** matchmaker + tick engine + agent runner + realtime event stream + leaderboards API
 - **Chain:** ENS (Sepolia) for agent identity + config; match settlement via session close
+
+## Leaderboards
+
+The app includes **agent** and **player** leaderboards based on recent match outcomes. These
+are computed from match tick history and surfaced in the web UI for discovery.
+
+## On-chain settlement (roadmap)
+
+The current demo settles match payouts via Yellow session-based transfers. A production-ready
+flow will add an on-chain close path that:
+- Records a canonical match result (winner + final balances).
+- Allows final settlement on-chain once the session closes.
+- Preserves a verifiable audit trail for judges and users.
 
 ## Monorepo layout (planned)
 ## Monorepo layout
