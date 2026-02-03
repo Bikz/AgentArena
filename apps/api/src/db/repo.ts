@@ -27,6 +27,22 @@ export type MatchListRow = {
   tick_count: number;
 };
 
+export type MatchPerformanceRow = {
+  match_id: string;
+  created_at: string;
+  phase: string;
+  tick_interval_ms: number;
+  max_ticks: number;
+  seat_id: string;
+  agent_id: string | null;
+  agent_name: string;
+  strategy: string;
+  owner_address: string | null;
+  final_tick: number | null;
+  final_price: string | null;
+  leaderboard: unknown | null;
+};
+
 export type MatchPaymentRow = {
   id: number;
   created_at: string;
@@ -281,4 +297,80 @@ export async function insertTick(
      on conflict (match_id, tick) do nothing`,
     [input.matchId, input.tick, input.ts, input.btcPrice, input.leaderboard],
   );
+}
+
+export async function listAgentPerformance(
+  pool: Pool,
+  input: { agentId: string; limit: number },
+) {
+  const res = await pool.query<MatchPerformanceRow>(
+    `
+    select
+      m.id as match_id,
+      m.created_at,
+      m.phase,
+      m.tick_interval_ms,
+      m.max_ticks,
+      s.seat_id,
+      s.agent_id,
+      s.agent_name,
+      s.strategy,
+      s.owner_address,
+      t.tick as final_tick,
+      t.btc_price as final_price,
+      t.leaderboard
+    from match_seats s
+    join matches m on m.id = s.match_id
+    left join lateral (
+      select tick, btc_price, leaderboard
+      from match_ticks
+      where match_id = s.match_id
+      order by tick desc
+      limit 1
+    ) t on true
+    where s.agent_id = $1
+    order by m.created_at desc
+    limit $2
+    `,
+    [input.agentId, input.limit],
+  );
+  return res.rows;
+}
+
+export async function listPlayerPerformance(
+  pool: Pool,
+  input: { ownerAddress: string; limit: number },
+) {
+  const res = await pool.query<MatchPerformanceRow>(
+    `
+    select
+      m.id as match_id,
+      m.created_at,
+      m.phase,
+      m.tick_interval_ms,
+      m.max_ticks,
+      s.seat_id,
+      s.agent_id,
+      s.agent_name,
+      s.strategy,
+      s.owner_address,
+      t.tick as final_tick,
+      t.btc_price as final_price,
+      t.leaderboard
+    from match_seats s
+    join matches m on m.id = s.match_id
+    left join lateral (
+      select tick, btc_price, leaderboard
+      from match_ticks
+      where match_id = s.match_id
+      order by tick desc
+      limit 1
+    ) t on true
+    where lower(s.owner_address) = lower($1)
+    order by m.created_at desc
+    limit $2
+    `,
+    [input.ownerAddress, input.limit],
+  );
+  return res.rows;
 }

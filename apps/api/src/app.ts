@@ -21,6 +21,8 @@ import {
   insertTick,
   listAgents,
   listMatches,
+  listAgentPerformance,
+  listPlayerPerformance,
   attachLatestEntryPaymentToMatch,
   insertMatchPayment,
   setAgentEns,
@@ -44,6 +46,104 @@ type WsClient = {
 };
 
 type WsAction = "subscribe" | "join_queue" | "leave_queue";
+
+type PerformanceMatch = {
+  matchId: string;
+  createdAt: string;
+  phase: string;
+  tickIntervalMs: number;
+  maxTicks: number;
+  seatId: string;
+  agentId: string | null;
+  agentName: string;
+  strategy: string;
+  ownerAddress: string | null;
+  finalTick: number | null;
+  finalPrice: string | null;
+  finalCredits: number | null;
+  finalTarget: number | null;
+  finalNote: string | null;
+  isWinner: boolean;
+};
+
+const buildPerformanceResponse = (
+  rows: Array<{
+    match_id: string;
+    created_at: string;
+    phase: string;
+    tick_interval_ms: number;
+    max_ticks: number;
+    seat_id: string;
+    agent_id: string | null;
+    agent_name: string;
+    strategy: string;
+    owner_address: string | null;
+    final_tick: number | null;
+    final_price: string | null;
+    leaderboard: any;
+  }>,
+) => {
+  const matches: PerformanceMatch[] = rows.map((row) => {
+    const leaderboard = Array.isArray(row.leaderboard) ? row.leaderboard : [];
+    const seat = leaderboard.find((l: any) => String(l?.seatId) === row.seat_id);
+    const finalCredits =
+      typeof seat?.credits === "number" ? seat.credits : seat?.credits ? Number(seat.credits) : null;
+    const finalTarget =
+      typeof seat?.target === "number" ? seat.target : seat?.target ? Number(seat.target) : null;
+    const finalNote = typeof seat?.note === "string" ? seat.note : null;
+    const topCredits =
+      leaderboard.length > 0
+        ? Math.max(
+            ...leaderboard.map((l: any) =>
+              typeof l?.credits === "number" ? l.credits : Number(l?.credits ?? 0),
+            ),
+          )
+        : null;
+    const isWinner =
+      finalCredits !== null && topCredits !== null ? finalCredits === topCredits : false;
+
+    return {
+      matchId: row.match_id,
+      createdAt: row.created_at,
+      phase: row.phase,
+      tickIntervalMs: row.tick_interval_ms,
+      maxTicks: row.max_ticks,
+      seatId: row.seat_id,
+      agentId: row.agent_id,
+      agentName: row.agent_name,
+      strategy: row.strategy,
+      ownerAddress: row.owner_address,
+      finalTick: row.final_tick ?? null,
+      finalPrice: row.final_price ?? null,
+      finalCredits,
+      finalTarget,
+      finalNote,
+      isWinner,
+    };
+  });
+
+  const completed = matches.filter((m) => m.finalCredits !== null);
+  const wins = matches.filter((m) => m.isWinner).length;
+  const avgCredits =
+    completed.length > 0
+      ? completed.reduce((acc, m) => acc + (m.finalCredits ?? 0), 0) / completed.length
+      : null;
+  const bestCredits =
+    completed.length > 0
+      ? Math.max(...completed.map((m) => m.finalCredits ?? 0))
+      : null;
+
+  return {
+    summary: {
+      matches: matches.length,
+      wins,
+      winRate: matches.length ? wins / matches.length : 0,
+      avgCredits,
+      bestCredits,
+    },
+    matches,
+  };
+};
 
 export function buildApp() {
   const app = Fastify({
@@ -372,6 +472,9 @@ export function buildApp() {
   const MatchesQuery = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
   });
+  const PerfQuery = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  });
   app.get(
     "/matches",
     { schema: { querystring: MatchesQuery } },
@@ -406,6 +509,19 @@ export function buildApp() {
           ens_claimed_at: agent.ens_claimed_at ?? null,
         },
       };
+    },
+  );
+  app.get(
+    "/agents/:agentId/perf",
+    { schema: { params: AgentParams, querystring: PerfQuery } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const limit = req.query.limit ?? 20;
+      const rows = await listAgentPerformance(pool, {
+        agentId: req.params.agentId,
+        limit,
+      });
+      return buildPerformanceResponse(rows);
     },
   );
   app.get(
@@ -468,6 +584,21 @@ export function buildApp() {
       if (!address) return reply.code(401).send({ error: "unauthorized" });
       const id = await createAgent(pool, { ...req.body, ownerAddress: address });
       return { id };
+    },
+  );
+
+  const PlayerParams = z.object({ address: z.string().min(1) });
+  app.get(
+    "/players/:address/perf",
+    { schema: { params: PlayerParams, querystring: PerfQuery } },
+    async (req, reply) => {
+      if (!pool) return reply.code(501).send({ error: "db_not_configured" });
+      const limit = req.query.limit ?? 20;
+      const rows = await listPlayerPerformance(pool, {
+        ownerAddress: req.params.address,
+        limit,
+      });
+      return buildPerformanceResponse(rows);
     },
   );
 
