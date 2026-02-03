@@ -1119,6 +1119,13 @@ export function buildApp() {
     startPrice: matchStartPrice,
   });
 
+  app.get("/metrics", async () => ({
+    uptimeSec: Math.round(process.uptime()),
+    ws: { connections: wsClients.size },
+    queue: { size: engine.getQueueSize() },
+    matches: engine.getMatchCounts(),
+  }));
+
   if (paidMatches && queueRefundMs > 0) {
     queueRefundInterval = setInterval(() => {
       const now = Date.now();

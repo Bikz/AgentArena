@@ -110,6 +110,23 @@ export class MatchEngine {
     return this.matchById.get(matchId);
   }
 
+  getMatchCounts() {
+    let active = 0;
+    let finished = 0;
+    for (const match of this.matchById.values()) {
+      if (match.phase === "finished") {
+        finished += 1;
+      } else {
+        active += 1;
+      }
+    }
+    return {
+      total: this.matchById.size,
+      active,
+      finished,
+    };
+  }
+
   isQueued(clientId: string) {
     return this.queue.some((q) => q.clientId === clientId);
   }
