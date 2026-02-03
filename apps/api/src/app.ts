@@ -459,7 +459,10 @@ export function buildApp() {
         return reply.code(400).send({ error: "invalid_message" as const });
       }
 
-      const domain = process.env.SIWE_DOMAIN;
+      // Dev default: agentarena.local (matches test fixtures). Set SIWE_DOMAIN in prod.
+      const domain =
+        process.env.SIWE_DOMAIN ??
+        (process.env.NODE_ENV === "production" ? undefined : "agentarena.local");
       if (domain && siwe.domain !== domain) {
         return reply.code(401).send({ error: "invalid_domain" as const });
       }
@@ -866,6 +869,7 @@ export function buildApp() {
     string,
     { value: Awaited<ReturnType<typeof getAgent>>; expiresAt: number }
   >();
+  // Cache TTL prevents stale agent config; override via AGENT_CACHE_TTL_MS.
   const agentCacheTtlMs = Number(process.env.AGENT_CACHE_TTL_MS ?? "60000");
   const getCachedAgent = (agentId: string) => {
     const cached = agentCache.get(agentId);
