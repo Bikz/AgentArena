@@ -230,6 +230,14 @@ export function Lobby() {
                 <div className="text-sm text-muted-foreground">
                   Signed in
                 </div>
+                {auth.sessionAddress ? (
+                  <Link
+                    href={`/players/${auth.sessionAddress}`}
+                    className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+                  >
+                    My profile
+                  </Link>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => auth.signOut()}

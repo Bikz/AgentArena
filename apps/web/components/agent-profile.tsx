@@ -24,6 +24,38 @@ type PrivateAgent = PublicAgent & {
   prompt: string;
 };
 
+type PerfSummary = {
+  matches: number;
+  wins: number;
+  winRate: number;
+  avgCredits: number | null;
+  bestCredits: number | null;
+};
+
+type PerfMatch = {
+  matchId: string;
+  createdAt: string;
+  phase: string;
+  tickIntervalMs: number;
+  maxTicks: number;
+  seatId: string;
+  agentId: string | null;
+  agentName: string;
+  strategy: string;
+  ownerAddress: string | null;
+  finalTick: number | null;
+  finalPrice: string | null;
+  finalCredits: number | null;
+  finalTarget: number | null;
+  finalNote: string | null;
+  isWinner: boolean;
+};
+
+type PerfResponse = {
+  summary: PerfSummary;
+  matches: PerfMatch[];
+};
+
 async function fetchPublicAgent(agentId: string): Promise<PublicAgent | null> {
   const res = await fetch(`${apiBaseHttp()}/agents/${agentId}/public`, { cache: "no-store" });
   if (!res.ok) return null;
@@ -41,6 +73,12 @@ async function fetchPrivateAgent(agentId: string): Promise<PrivateAgent | null> 
   return json.agent;
 }
 
+async function fetchAgentPerf(agentId: string): Promise<PerfResponse | null> {
+  const res = await fetch(`${apiBaseHttp()}/agents/${agentId}/perf`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export function AgentProfile({ agentId }: { agentId: string }) {
   const auth = useAuth();
 
@@ -51,6 +89,9 @@ export function AgentProfile({ agentId }: { agentId: string }) {
   const [privateAgent, setPrivateAgent] = useState<PrivateAgent | null>(null);
   const [privateState, setPrivateState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [privateError, setPrivateError] = useState<string | null>(null);
+
+  const [perf, setPerf] = useState<PerfResponse | null>(null);
+  const [perfState, setPerfState] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +113,32 @@ export function AgentProfile({ agentId }: { agentId: string }) {
         if (cancelled) return;
         setPublicState("error");
         setPublicError(err instanceof Error ? err.message : "Unknown error");
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setPerfState("loading");
+      try {
+        const data = await fetchAgentPerf(agentId);
+        if (cancelled) return;
+        if (!data) {
+          setPerf(null);
+          setPerfState("error");
+          return;
+        }
+        setPerf(data);
+        setPerfState("ready");
+      } catch {
+        if (cancelled) return;
+        setPerf(null);
+        setPerfState("error");
       }
     };
     void run();
@@ -213,6 +280,84 @@ export function AgentProfile({ agentId }: { agentId: string }) {
       </section>
 
       <ClaimEnsCard agent={publicAgent} />
+
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="text-base font-medium">Performance</h2>
+        <div className="mt-1 text-sm text-muted-foreground">
+          Recent matches and aggregate stats for this agent.
+        </div>
+
+        {perfState === "loading" ? (
+          <div className="mt-4 text-sm text-muted-foreground">Loading performance…</div>
+        ) : perfState === "error" || !perf ? (
+          <div className="mt-4 text-sm text-muted-foreground">
+            Performance unavailable (DB not configured or no matches yet).
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
+                <div className="text-xs text-muted-foreground">Matches</div>
+                <div className="mt-1 text-lg font-medium">{perf.summary.matches}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
+                <div className="text-xs text-muted-foreground">Win rate</div>
+                <div className="mt-1 text-lg font-medium">
+                  {(perf.summary.winRate * 100).toFixed(0)}%
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
+                <div className="text-xs text-muted-foreground">Best credits</div>
+                <div className="mt-1 text-lg font-medium">
+                  {perf.summary.bestCredits !== null
+                    ? perf.summary.bestCredits.toFixed(2)
+                    : "—"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              {perf.matches.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No matches yet.</div>
+              ) : (
+                <table className="w-full text-left text-sm">
+                  <thead className="text-muted-foreground">
+                    <tr>
+                      <th className="py-2 pr-4 font-medium">Match</th>
+                      <th className="py-2 pr-4 font-medium">Result</th>
+                      <th className="py-2 pr-4 font-medium">Final credits</th>
+                      <th className="py-2 pr-4 font-medium">When</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {perf.matches.map((m) => (
+                      <tr key={m.matchId} className="border-t border-border">
+                        <td className="py-2 pr-4">
+                          <Link
+                            href={`/replay/${m.matchId}`}
+                            className="underline-offset-4 hover:underline"
+                          >
+                            {m.matchId}
+                          </Link>
+                        </td>
+                        <td className="py-2 pr-4">
+                          {m.isWinner ? "Winner" : "—"}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {m.finalCredits !== null ? m.finalCredits.toFixed(2) : "—"}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {new Date(m.createdAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
+      </section>
     </main>
   );
 }
