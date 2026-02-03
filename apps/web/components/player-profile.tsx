@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiBaseHttp } from "@/lib/api";
+import { ShareLinkButton } from "@/components/share-link-button";
 
 type PerfSummary = {
   matches: number;
@@ -82,9 +83,12 @@ export function PlayerProfile({ address }: { address: string }) {
           <h1 className="text-2xl font-semibold tracking-tight">Player profile</h1>
           <div className="mt-1 break-all text-sm text-muted-foreground">{address}</div>
         </div>
-        <Link href="/" className="text-sm underline underline-offset-4">
-          Back to lobby
-        </Link>
+        <div className="flex items-center gap-3">
+          <ShareLinkButton path={`/players/${address}`} label="Share" />
+          <Link href="/" className="text-sm underline underline-offset-4">
+            Back to lobby
+          </Link>
+        </div>
       </header>
 
       <section className="rounded-2xl border border-border bg-card p-5">
@@ -178,4 +182,3 @@ export function PlayerProfile({ address }: { address: string }) {
     </main>
   );
 }
-

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { apiBaseHttp } from "@/lib/api";
 import { ClaimEnsCard } from "@/components/claim-ens-card";
 import { useAuth } from "@/hooks/useAuth";
+import { ShareLinkButton } from "@/components/share-link-button";
 
 type PublicAgent = {
   id: string;
@@ -220,9 +221,12 @@ export function AgentProfile({ agentId }: { agentId: string }) {
             {publicAgent.strategy} · {publicAgent.model}
           </div>
         </div>
-        <Link href="/agents" className="text-sm underline underline-offset-4">
-          Back
-        </Link>
+        <div className="flex items-center gap-3">
+          <ShareLinkButton path={`/agents/${publicAgent.id}`} label="Share" />
+          <Link href="/agents" className="text-sm underline underline-offset-4">
+            Back
+          </Link>
+        </div>
       </header>
 
       <section className="rounded-2xl border border-border bg-card p-5">
