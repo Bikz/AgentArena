@@ -4,6 +4,7 @@ import { type ServerEvent } from "@agent-arena/shared";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useWsEvents } from "@/hooks/useWsEvents";
+import { ShareLinkButton } from "@/components/share-link-button";
 
 function formatSeconds(ms: number) {
   if (!Number.isFinite(ms) || ms <= 0) return "0s";
@@ -155,6 +156,7 @@ export function MatchView({ matchId }: { matchId: string }) {
             <Link href="/replay" className="underline underline-offset-4">
               Replays
             </Link>
+            <ShareLinkButton path={`/match/${matchId}`} label="Share" />
           </div>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">{matchId}</h1>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ShareLinkButton } from "@/components/share-link-button";
 
 type ReplayData = {
   match: {
@@ -88,6 +89,7 @@ export async function ReplayView({ matchId }: { matchId: string }) {
           <Link href={`/match/${matchId}`} className="underline underline-offset-4">
             Live view
           </Link>
+          <ShareLinkButton path={`/replay/${matchId}`} label="Share" />
         </div>
       </header>
 
