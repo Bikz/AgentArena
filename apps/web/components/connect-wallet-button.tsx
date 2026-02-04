@@ -13,16 +13,38 @@ export function ConnectWalletButton() {
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
 
+  const available = connectors.filter((connector) =>
+    "ready" in connector ? connector.ready : true,
+  );
+  const injected = available.find((connector) => connector.id === "injected");
+  const walletConnect = available.find((connector) => connector.id === "walletConnect");
+  const primary = injected ?? walletConnect ?? available[0];
+
   if (!isConnected) {
     return (
-      <button
-        type="button"
-        disabled={isPending || connectors.length === 0}
-        onClick={() => connect({ connector: connectors[0]! })}
-        className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-      >
-        {isPending ? "Connecting…" : "Connect wallet"}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={isPending || !primary}
+          onClick={() => primary && connect({ connector: primary })}
+          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+        >
+          {isPending ? "Connecting…" : primary?.name ?? "Connect wallet"}
+        </button>
+        {walletConnect && primary?.id !== walletConnect.id ? (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => connect({ connector: walletConnect })}
+            className="rounded-full border border-border bg-card px-3 py-2 text-xs text-foreground transition-colors hover:bg-muted/40 disabled:opacity-50"
+          >
+            WalletConnect
+          </button>
+        ) : null}
+        {!primary ? (
+          <span className="text-xs text-muted-foreground">No wallet available</span>
+        ) : null}
+      </div>
     );
   }
 

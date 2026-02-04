@@ -104,6 +104,8 @@ pnpm -C apps/api db:migrate
 Frontend:
 - `NEXT_PUBLIC_API_HTTP_URL` (default: `http://localhost:3001`)
 - `NEXT_PUBLIC_API_WS_URL` (default: `ws://localhost:3001/ws`)
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` (optional; enables WalletConnect)
+- `NEXT_PUBLIC_SITE_URL` (optional; WalletConnect metadata URL, default `http://localhost:3000`)
 
 Backend (optional but recommended):
 - `SESSION_KEY_BASE64` (cookie session encryption key; sessions reset on restart if unset)
