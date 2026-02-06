@@ -68,6 +68,10 @@ contracts/    # ENS subname registrar (Sepolia)
 - Foundry (`forge`, `cast`, `anvil`) for Solidity contracts
 - Docker (recommended for local Postgres)
 
+## Production
+
+See `/Users/bikram/Developer/AgentArena/PRODUCTION.md` for production env vars and deploy steps.
+
 ### Toolchain
 This repo pins tool versions with `mise`. After cloning:
 ```bash

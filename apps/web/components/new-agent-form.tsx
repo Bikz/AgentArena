@@ -11,7 +11,7 @@ export function NewAgentForm() {
   const router = useRouter();
   const auth = useAuth();
   const [name, setName] = useState("MyAgent");
-  const [model, setModel] = useState("gpt-4o-mini");
+  const [model, setModel] = useState("openai/gpt-4o-mini");
   const [strategy, setStrategy] = useState<Strategy>("trend");
   const [prompt, setPrompt] = useState(
     "You are a trading agent competing in Agent Arena. Output a target exposure between -1 and 1 each tick.",
@@ -122,10 +122,11 @@ export function NewAgentForm() {
               value={model}
               onChange={(e) => setModel(e.target.value)}
               className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="gpt-4o-mini"
+              placeholder="openai/gpt-4o-mini"
             />
             <div className="mt-1 text-xs text-muted-foreground">
-              Used when `AI_GATEWAY_API_KEY` is set on the API.
+              Used when `AI_GATEWAY_API_KEY` is set on the API. Format:
+              <span className="font-mono"> openai/&lt;model&gt;</span>.
             </div>
           </div>
           <div className="md:col-span-2">

@@ -57,6 +57,21 @@ type WsClient = {
 
 type WsAction = "subscribe" | "join_queue" | "leave_queue";
 
+function envCsv(name: string) {
+  const raw = process.env[name];
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function normalizeOrigin(origin: string) {
+  const trimmed = origin.trim();
+  if (!trimmed) return "";
+  return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
+}
+
 type PerformanceMatch = {
   matchId: string;
   createdAt: string;
@@ -175,11 +190,30 @@ const buildPerformanceResponse = (
 };
 
 export function buildApp() {
-  if (process.env.NODE_ENV === "production" && !process.env.SIWE_DOMAIN) {
+  const isProd = process.env.NODE_ENV === "production";
+  const requireDb = isProd
+    ? process.env.REQUIRE_DB !== "0"
+    : process.env.REQUIRE_DB === "1";
+
+  const allowedOrigins = new Set(
+    envCsv("CORS_ORIGINS").map((origin) => normalizeOrigin(origin)),
+  );
+
+  if (isProd && !process.env.SIWE_DOMAIN) {
     throw new Error("SIWE_DOMAIN is required in production");
+  }
+  if (isProd && !process.env.SESSION_KEY_BASE64) {
+    throw new Error("SESSION_KEY_BASE64 is required in production");
+  }
+  if (isProd && allowedOrigins.size === 0) {
+    throw new Error("CORS_ORIGINS is required in production");
+  }
+  if (requireDb && !process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required when REQUIRE_DB is enabled");
   }
 
   const app = Fastify({
+    trustProxy: process.env.TRUST_PROXY === "1",
     logger: {
       transport:
         process.env.NODE_ENV === "development"
@@ -193,7 +227,16 @@ export function buildApp() {
   app.setSerializerCompiler(serializerCompiler);
 
   app.register(helmet);
-  app.register(cors, { origin: true, credentials: true });
+  app.register(cors, {
+    credentials: true,
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (!isProd) return cb(null, true);
+      const normalized = normalizeOrigin(origin);
+      if (allowedOrigins.has(normalized)) return cb(null, true);
+      cb(new Error("origin_not_allowed"), false);
+    },
+  });
   app.register(websocket);
   app.register(cookie);
   app.register(rateLimit, {
@@ -347,6 +390,39 @@ export function buildApp() {
   };
 
   app.get("/health", async () => ({ ok: true as const }));
+  app.get("/ready", async (_req, reply) => {
+    if (requireDb) {
+      if (!pool) {
+        return reply
+          .code(503)
+          .send({ ok: false as const, error: "db_not_configured" as const });
+      }
+      try {
+        // Ensure the DB is reachable (not just configured) for platform health checks.
+        await pool.query("select 1 as ok");
+      } catch (err) {
+        app.log.error({ err }, "db not ready");
+        return reply.code(503).send({ ok: false as const, error: "db_not_ready" as const });
+      }
+    }
+
+    const onchainRequested = process.env.ONCHAIN_SETTLEMENT_ENABLED === "1";
+    if (onchainRequested && !onchain.isEnabled()) {
+      return reply.code(503).send({
+        ok: false as const,
+        error: "onchain_not_configured" as const,
+      });
+    }
+
+    if (paidMatches && !yellow.getHouseWallet()) {
+      return reply.code(503).send({
+        ok: false as const,
+        error: "house_not_configured" as const,
+      });
+    }
+
+    return { ok: true as const };
+  });
   app.get("/status", async () => ({
     db: { configured: Boolean(pool) },
     ai: { enabled: Boolean(process.env.AI_GATEWAY_API_KEY) },
@@ -1265,6 +1341,17 @@ export function buildApp() {
         websocket: true,
       },
       (socket, req) => {
+        if (isProd) {
+          const raw = req.headers.origin;
+          const origin = Array.isArray(raw) ? raw[0] : raw;
+          const normalized = origin ? normalizeOrigin(origin) : "";
+          if (!normalized || !allowedOrigins.has(normalized)) {
+            req.log.warn({ origin }, "ws origin rejected");
+            socket.close(1008, "origin_not_allowed");
+            return;
+          }
+        }
+
         const query = req.query as { clientId?: string };
         const clientLabel = query.clientId ?? "anon";
         const clientId = `ws-${crypto.randomUUID()}`;
