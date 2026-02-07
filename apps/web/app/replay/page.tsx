@@ -12,11 +12,15 @@ type MatchListRow = {
 };
 
 async function fetchMatches(): Promise<MatchListRow[] | null> {
-  const base = process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
-  const res = await fetch(`${base}/matches?limit=25`, { cache: "no-store" });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { matches: MatchListRow[] };
-  return json.matches ?? [];
+  try {
+    const base = process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
+    const res = await fetch(`${base}/matches?limit=25`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { matches: MatchListRow[] };
+    return json.matches ?? [];
+  } catch {
+    return null;
+  }
 }
 
 export default async function ReplaysIndexPage() {

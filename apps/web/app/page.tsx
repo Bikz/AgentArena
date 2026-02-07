@@ -46,36 +46,52 @@ type ConfigResponse = {
 };
 
 async function fetchAgentLeaders(): Promise<AgentLeader[] | null> {
-  const url = new URL(`${apiBaseHttp()}/leaderboards/agents`);
-  url.searchParams.set("limit", "5");
-  url.searchParams.set("minMatches", "1");
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { leaders: AgentLeader[] };
-  return json.leaders ?? [];
+  try {
+    const url = new URL(`${apiBaseHttp()}/leaderboards/agents`);
+    url.searchParams.set("limit", "5");
+    url.searchParams.set("minMatches", "1");
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { leaders: AgentLeader[] };
+    return json.leaders ?? [];
+  } catch {
+    return null;
+  }
 }
 
 async function fetchPlayerLeaders(): Promise<PlayerLeader[] | null> {
-  const url = new URL(`${apiBaseHttp()}/leaderboards/players`);
-  url.searchParams.set("limit", "5");
-  url.searchParams.set("minMatches", "1");
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { leaders: PlayerLeader[] };
-  return json.leaders ?? [];
+  try {
+    const url = new URL(`${apiBaseHttp()}/leaderboards/players`);
+    url.searchParams.set("limit", "5");
+    url.searchParams.set("minMatches", "1");
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { leaders: PlayerLeader[] };
+    return json.leaders ?? [];
+  } catch {
+    return null;
+  }
 }
 
 async function fetchRecentMatches(): Promise<MatchRow[] | null> {
-  const res = await fetch(`${apiBaseHttp()}/matches?limit=5`, { cache: "no-store" });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { matches: MatchRow[] };
-  return json.matches ?? [];
+  try {
+    const res = await fetch(`${apiBaseHttp()}/matches?limit=5`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { matches: MatchRow[] };
+    return json.matches ?? [];
+  } catch {
+    return null;
+  }
 }
 
 async function fetchConfig(): Promise<ConfigResponse | null> {
-  const res = await fetch(`${apiBaseHttp()}/config`, { cache: "no-store" });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${apiBaseHttp()}/config`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 export default async function HomePage() {

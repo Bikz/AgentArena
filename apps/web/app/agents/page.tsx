@@ -27,10 +27,14 @@ const STRATEGY_LABELS: Record<Agent["strategy"], string> = {
 };
 
 async function fetchAgents(): Promise<Agent[] | null> {
-  const res = await fetch(`${apiBaseHttp()}/agents`, { cache: "no-store" });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { agents: Agent[] };
-  return json.agents;
+  try {
+    const res = await fetch(`${apiBaseHttp()}/agents`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { agents: Agent[] };
+    return json.agents;
+  } catch {
+    return null;
+  }
 }
 
 export default async function AgentsPage() {

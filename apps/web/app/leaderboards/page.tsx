@@ -31,19 +31,27 @@ function buildLeaderboardUrl(path: string, params: { sinceDays?: number | null; 
 }
 
 async function fetchAgentLeaders(params: { sinceDays?: number | null; minMatches: number }) {
-  const res = await fetch(buildLeaderboardUrl("/leaderboards/agents", params), {
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as { updatedAt: string; leaders: AgentLeader[] };
+  try {
+    const res = await fetch(buildLeaderboardUrl("/leaderboards/agents", params), {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as { updatedAt: string; leaders: AgentLeader[] };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchPlayerLeaders(params: { sinceDays?: number | null; minMatches: number }) {
-  const res = await fetch(buildLeaderboardUrl("/leaderboards/players", params), {
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as { updatedAt: string; leaders: PlayerLeader[] };
+  try {
+    const res = await fetch(buildLeaderboardUrl("/leaderboards/players", params), {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as { updatedAt: string; leaders: PlayerLeader[] };
+  } catch {
+    return null;
+  }
 }
 
 const WINDOW_OPTIONS = [
