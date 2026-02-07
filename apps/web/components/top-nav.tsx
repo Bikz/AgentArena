@@ -1,13 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useAccount } from "wagmi";
+import { useAccount, useConnect } from "wagmi";
+import type { Connector } from "wagmi";
 import { ConnectWalletButton } from "@/components/connect-wallet-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/useAuth";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function pickPrimaryConnector(connectors: readonly Connector[]) {
+  const available = connectors.filter((connector) =>
+    "ready" in connector ? connector.ready : true,
+  );
+  const injected = available.find((connector) => connector.id === "injected");
+  const walletConnect = available.find((connector) => connector.id === "walletConnect");
+  return injected ?? walletConnect ?? available[0] ?? null;
 }
 
 const NAV_LINKS = [
@@ -27,7 +37,9 @@ const FILTER_LINKS = [
 
 export function TopNav() {
   const { isConnected, address } = useAccount();
+  const { connect, connectors, isPending: isConnecting } = useConnect();
   const auth = useAuth();
+  const primaryConnector = pickPrimaryConnector(connectors);
 
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
@@ -89,15 +101,27 @@ export function TopNav() {
               ) : (
                 <button
                   type="button"
-                  disabled={!isConnected || auth.state === "signing" || auth.state === "loading"}
-                  onClick={() => auth.signIn()}
+                  disabled={
+                    auth.state === "signing" ||
+                    auth.state === "loading" ||
+                    (!isConnected && (isConnecting || !primaryConnector))
+                  }
+                  onClick={() => {
+                    if (isConnected) {
+                      void auth.signIn();
+                      return;
+                    }
+                    if (primaryConnector) connect({ connector: primaryConnector });
+                  }}
                   className="underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
                 >
                   {auth.state === "signing"
                     ? "Signing…"
                     : isConnected
                       ? "Sign in"
-                      : "Connect to sign in"}
+                      : isConnecting
+                        ? "Connecting…"
+                        : "Connect to sign in"}
                 </button>
               )}
             </div>
