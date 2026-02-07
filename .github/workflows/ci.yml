@@ -46,31 +46,6 @@ jobs:
       - name: Unit tests
         run: pnpm -C apps/api test
 
-  deploy_web:
-    # Deploy web to Vercel on every push to main (Render auto-deploys API from GitHub).
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [validate, gitleaks, audit]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: jdx/mise-action@v2
-        with:
-          mise_toml: .mise.toml
-
-      - name: Deploy web (Vercel)
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          if [ -z "${VERCEL_TOKEN:-}" ]; then
-            echo "Missing GitHub secret VERCEL_TOKEN" >&2
-            exit 1
-          fi
-
-          # Link (creates .vercel locally in CI workspace) then deploy.
-          npx vercel@50.11.0 link --project agentarena-web --yes --token "$VERCEL_TOKEN" --scope bikzs-projects
-          npx vercel@50.11.0 deploy --prod --yes --token "$VERCEL_TOKEN" --scope bikzs-projects
-
   gitleaks:
     runs-on: ubuntu-latest
     steps:
