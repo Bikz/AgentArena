@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { concatHex, keccak256, stringToHex } from "viem";
+import { sepolia } from "viem/chains";
 import { agentArenaSubnameRegistrarAbi, getParentNamehash, getRegistrarAddress } from "@/lib/ens-registrar";
 import { useAuth } from "@/hooks/useAuth";
 import { useToasts } from "@/components/toast-provider";
@@ -65,6 +66,7 @@ export function ClaimEnsCard(props: {
       isConnected &&
       auth.isSignedIn &&
       address &&
+      chainId === sepolia.id &&
       props.agent.owner_address &&
       props.agent.owner_address.toLowerCase() === address.toLowerCase() &&
       registrar &&
@@ -75,6 +77,7 @@ export function ClaimEnsCard(props: {
   }, [
     address,
     auth.isSignedIn,
+    chainId,
     isConnected,
     label.length,
     parentNamehash,
@@ -261,13 +264,17 @@ export function ClaimEnsCard(props: {
                     ? "Confirming…"
                     : "Claim subname"}
         </button>
-        <div className="text-sm text-muted-foreground">
-          {receipt.isLoading
-            ? "Waiting for confirmation…"
-            : receipt.isSuccess
-              ? "Confirmed"
-              : " "}
-        </div>
+        {chainId != null && chainId !== sepolia.id ? (
+          <div className="text-sm text-muted-foreground">Switch to Sepolia to claim.</div>
+        ) : (
+          <div className="text-sm text-muted-foreground">
+            {receipt.isLoading
+              ? "Waiting for confirmation…"
+              : receipt.isSuccess
+                ? "Confirmed"
+                : " "}
+          </div>
+        )}
       </div>
 
       {error ? (
