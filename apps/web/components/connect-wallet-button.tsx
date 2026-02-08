@@ -7,16 +7,26 @@ function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
+function hasInjectedProvider() {
+  if (typeof window === "undefined") return false;
+  return Boolean((window as any).ethereum);
+}
+
 export function ConnectWalletButton() {
   const { address, isConnected, chainId } = useAccount();
-  const { connect, connectors, isPending } = useConnect();
+  const { connect, connectors, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
 
-  const available = connectors.filter((connector) =>
-    "ready" in connector ? connector.ready : true,
-  );
-  const injected = available.find((connector) => connector.id === "injected");
+  // wagmi's injected connector can exist even when no provider is installed.
+  // Prefer WalletConnect in that case, otherwise "connect" looks like a no-op.
+  const available = connectors.filter((connector) => {
+    if (connector.id === "injected") return hasInjectedProvider();
+    return "ready" in connector ? connector.ready : true;
+  });
+  const injected = hasInjectedProvider()
+    ? available.find((connector) => connector.id === "injected")
+    : undefined;
   const walletConnect = available.find((connector) => connector.id === "walletConnect");
   const primary = injected ?? walletConnect ?? available[0];
 
@@ -43,6 +53,11 @@ export function ConnectWalletButton() {
         ) : null}
         {!primary ? (
           <span className="text-xs text-muted-foreground">No wallet available</span>
+        ) : null}
+        {error ? (
+          <span className="text-xs text-destructive">
+            {error.message}
+          </span>
         ) : null}
       </div>
     );

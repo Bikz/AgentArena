@@ -11,11 +11,18 @@ function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
+function hasInjectedProvider() {
+  if (typeof window === "undefined") return false;
+  return Boolean((window as any).ethereum);
+}
+
 function pickPrimaryConnector(connectors: readonly Connector[]) {
   const available = connectors.filter((connector) =>
     "ready" in connector ? connector.ready : true,
   );
-  const injected = available.find((connector) => connector.id === "injected");
+  const injected = hasInjectedProvider()
+    ? available.find((connector) => connector.id === "injected")
+    : undefined;
   const walletConnect = available.find((connector) => connector.id === "walletConnect");
   return injected ?? walletConnect ?? available[0] ?? null;
 }
@@ -37,7 +44,7 @@ const FILTER_LINKS = [
 
 export function TopNav() {
   const { isConnected, address } = useAccount();
-  const { connect, connectors, isPending: isConnecting } = useConnect();
+  const { connect, connectors, isPending: isConnecting, error: connectError } = useConnect();
   const auth = useAuth();
   const primaryConnector = pickPrimaryConnector(connectors);
 
@@ -144,6 +151,12 @@ export function TopNav() {
       {auth.error ? (
         <div className="border-t border-border bg-destructive/10 px-6 py-2 text-xs text-destructive-foreground">
           {auth.error}
+        </div>
+      ) : null}
+
+      {connectError ? (
+        <div className="border-t border-border bg-destructive/10 px-6 py-2 text-xs text-destructive-foreground">
+          {connectError.message}
         </div>
       ) : null}
 
