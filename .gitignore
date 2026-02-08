@@ -50,3 +50,6 @@ output/
 tmp/
 .vercel
 .env*.local
+
+# Foundry
+contracts/cache/
