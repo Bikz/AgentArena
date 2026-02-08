@@ -1,4 +1,5 @@
 import { Lobby } from "@/components/lobby";
+import { ArcCard } from "@/components/arc-card";
 import { YellowCard } from "@/components/yellow-card";
 import Link from "next/link";
 import { apiBaseHttp } from "@/lib/api";
@@ -43,6 +44,7 @@ type ConfigResponse = {
   paidMatches: boolean;
   entry: { asset: string; amount: string };
   match?: MatchConfig;
+  arc?: { enabled: boolean } | null;
 };
 
 async function fetchAgentLeaders(): Promise<AgentLeader[] | null> {
@@ -107,6 +109,7 @@ export default async function HomePage() {
   const entryLabel = config?.paidMatches
     ? `${config.entry.amount} ${config.entry.asset}`
     : "Free";
+  const settlementLabel = config?.arc?.enabled ? "Yellow + Arc USDC" : "Yellow session";
   const activeProgress = activeMatch
     ? Math.min(100, Math.round((activeMatch.tick_count / activeMatch.max_ticks) * 100))
     : 0;
@@ -123,7 +126,7 @@ export default async function HomePage() {
           </h1>
           <p className="text-sm text-muted-foreground">
             Join a match, spectate live strategies, and replay the best battles — all
-            settled instantly off-chain with Yellow.
+            settled instantly off-chain with Yellow and mirrored on-chain in USDC on Arc.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -166,7 +169,7 @@ export default async function HomePage() {
             {config?.match?.maxTicks ?? "—"} ticks
           </div>
           <div>Entry: {entryLabel}</div>
-          <div>Settlement: Yellow session</div>
+          <div>Settlement: {settlementLabel}</div>
         </div>
         {activeMatch ? (
           <div className="mt-4">
@@ -371,6 +374,8 @@ export default async function HomePage() {
 
         <aside className="flex flex-col gap-4" id="join-queue">
           <Lobby />
+
+          <ArcCard />
 
           <YellowCard />
         </aside>

@@ -131,9 +131,30 @@ export async function ReplayView({ matchId }: { matchId: string }) {
                         : "—"}
                     </td>
                     <td className="py-2 pr-4 text-muted-foreground">
-                      {p.tx && (p as any).tx?.hash
-                        ? `${(p as any).tx.hash.slice(0, 6)}…${(p as any).tx.hash.slice(-4)}`
-                        : "—"}
+                      {p.tx && (p as any).tx?.hash ? (
+                        (() => {
+                          const hash = String((p as any).tx.hash);
+                          const short = `${hash.slice(0, 6)}…${hash.slice(-4)}`;
+                          const isArcOnchain =
+                            (p.kind === "onchain_fund" || p.kind === "onchain_settlement") &&
+                            p.asset.toLowerCase() === "usdc" &&
+                            /^0x[0-9a-fA-F]{64}$/.test(hash);
+                          return isArcOnchain ? (
+                            <a
+                              href={`https://testnet.arcscan.app/tx/${hash}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline underline-offset-4"
+                            >
+                              {short}
+                            </a>
+                          ) : (
+                            short
+                          );
+                        })()
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="py-2 pr-4 text-muted-foreground">
                       {new Date(p.created_at).toLocaleString()}

@@ -66,11 +66,33 @@ export class OnchainSettlementService {
       return;
     }
 
-    const account = privateKeyToAccount(config.housePrivateKey);
-    const tokenAddress = getAddress(config.tokenAddress);
-    const contractAddress = getAddress(config.contractAddress);
-    const rakeRecipient = config.rakeRecipient ? getAddress(config.rakeRecipient) : account.address;
-    const rakeBps = config.rakeBps ?? 0;
+    // Misconfigured addresses/keys are common during deployments. Don't crash the whole API:
+    // disable this service and surface it via /ready + /status instead.
+    let account: ReturnType<typeof privateKeyToAccount>;
+    let tokenAddress: Address;
+    let contractAddress: Address;
+    let rakeRecipient: Address;
+    let rakeBps: number;
+    try {
+      account = privateKeyToAccount(config.housePrivateKey);
+      tokenAddress = getAddress(config.tokenAddress);
+      contractAddress = getAddress(config.contractAddress);
+      rakeRecipient = config.rakeRecipient ? getAddress(config.rakeRecipient) : account.address;
+      rakeBps = config.rakeBps ?? 0;
+    } catch (err) {
+      log.error(
+        {
+          err,
+          rpcUrl: config.rpcUrl,
+          tokenAddress: config.tokenAddress,
+          contractAddress: config.contractAddress,
+          rakeRecipient: config.rakeRecipient ?? null,
+        },
+        "onchain settlement enabled but invalid config (disabling)",
+      );
+      this.enabled = false;
+      return;
+    }
 
     this.enabled = true;
     this.account = account;

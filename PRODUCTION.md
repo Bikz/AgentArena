@@ -41,6 +41,10 @@ Yellow / Onchain (recommended OFF for first prod deploy):
 - `YELLOW_PAID_MATCHES=0`
 - `ONCHAIN_SETTLEMENT_ENABLED=0`
 
+Arc (Circle) mirror settlement (optional; recommended OFF for first prod deploy):
+
+- `ARC_ONCHAIN_ENABLED=0`
+
 ## Web: Required Environment Variables (Production)
 
 Set these on the web app:
@@ -105,4 +109,3 @@ In production, point your hosting health check to `/ready`.
 If you use platform-provided default domains (e.g. `*.vercel.app` + `*.onrender.com`),
 wallet sign-in cookies will likely not work reliably. Use a custom domain so Web+API are
 same-site (`app.<domain>` + `api.<domain>`).
-

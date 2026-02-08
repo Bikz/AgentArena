@@ -68,6 +68,17 @@ export const ServerEventSchema = z.discriminatedUnion("type", [
       }),
     ),
   }),
+  z.object({
+    // Sent once per match at the end to make payouts/auditability obvious to judges.
+    type: z.literal("match_finished"),
+    v: ProtocolVersionSchema,
+    matchId: z.string().min(1),
+    winnerSeatId: z.string().min(1),
+    payoutSeatId: z.string().min(1),
+    payoutWallet: z.string().min(1).optional(),
+    yellowPaid: z.boolean(),
+    arcTxHash: z.string().min(1).optional(),
+  }),
 ]);
 
 export type ServerEvent = z.infer<typeof ServerEventSchema>;

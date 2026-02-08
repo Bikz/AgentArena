@@ -46,6 +46,15 @@ export function Lobby() {
     contract: string | null;
     rakeBps: number | null;
   } | null>(null);
+  const [arcConfig, setArcConfig] = useState<{
+    enabled: boolean;
+    token: string | null;
+    contract: string | null;
+    rakeBps: number | null;
+    entryAmountBaseUnits?: string | null;
+    chainId?: number | null;
+    explorerBaseUrl?: string | null;
+  } | null>(null);
   const [status, setStatus] = useState<{
     db: { configured: boolean };
     ai?: { enabled: boolean };
@@ -58,6 +67,13 @@ export function Lobby() {
     demo?: { allowBots: boolean };
     onchain?: {
       enabled: boolean;
+      contractAddress: string | null;
+      tokenAddress: string | null;
+      houseAddress: string | null;
+    };
+    arc?: {
+      enabled: boolean;
+      requested?: boolean;
       contractAddress: string | null;
       tokenAddress: string | null;
       houseAddress: string | null;
@@ -94,6 +110,15 @@ export function Lobby() {
             contract: string | null;
             rakeBps: number | null;
           };
+          arc?: {
+            enabled: boolean;
+            token: string | null;
+            contract: string | null;
+            rakeBps: number | null;
+            entryAmountBaseUnits?: string | null;
+            chainId?: number | null;
+            explorerBaseUrl?: string | null;
+          };
         }>(`${base}/config`, { cache: "no-store" }, { timeoutMs: 10_000 });
         if (cancelled) return;
         setPaidMatches(Boolean(json.paidMatches));
@@ -101,6 +126,7 @@ export function Lobby() {
         setTickFee(json.tickFee ?? null);
         setMatchConfig(json.match ?? null);
         setOnchainConfig(json.onchain ?? null);
+        setArcConfig(json.arc ?? null);
       } catch {
         // ignore
       }
@@ -331,7 +357,12 @@ export function Lobby() {
           Start price: {matchConfig ? `$${Number(matchConfig.startPrice).toLocaleString()}` : "—"}
         </div>
         <div>
-          Settlement: {onchainConfig?.enabled ? "On-chain + Yellow" : "Yellow session"}
+          Settlement:{" "}
+          {arcConfig?.enabled
+            ? "Arc USDC + Yellow"
+            : onchainConfig?.enabled
+              ? "On-chain + Yellow"
+              : "Yellow session"}
         </div>
         {paidMatches && tickFee && tickFee.amount !== "0" ? (
           <div className="sm:col-span-2">
@@ -386,10 +417,14 @@ export function Lobby() {
               {status.onchain ? (
                 <span>On-chain: {status.onchain.enabled ? "on" : "off"}</span>
               ) : null}
+              {status.arc ? <span>Arc: {status.arc.enabled ? "on" : "off"}</span> : null}
               {status.onchain?.enabled && !status.onchain.contractAddress ? (
                 <span className="text-destructive-foreground/80">
                   Contract missing.
                 </span>
+              ) : null}
+              {status.arc?.requested && !status.arc.enabled ? (
+                <span className="text-destructive-foreground/80">Arc config missing.</span>
               ) : null}
               {status.yellow.paidMatches && !status.yellow.houseConfigured ? (
                 <span className="text-destructive-foreground/80">

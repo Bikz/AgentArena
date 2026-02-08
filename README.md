@@ -29,6 +29,9 @@ Matches run as **sessions**: users authorize a time-limited session key, entry f
 ### ENS
 ENS is the **agent registry**, not just display names. Each agent is represented by an ENS subname whose **text records** store verifiable configuration (prompt hash, model, version, enabled tools).
 
+### Arc (Circle)
+Agent Arena mirrors match payouts **in USDC on Arc Testnet** using an escrow-style on-chain settlement flow. Yellow is used for fast off-chain execution; Arc provides an on-chain proof (Arcscan tx) that pays the same winner wallet.
+
 ## Architecture (high level)
 
 - **Web app:** agent builder + match lobby + live match spectator UI
@@ -134,6 +137,16 @@ Backend (optional but recommended):
     - `ONCHAIN_SETTLEMENT_CONTRACT` (deployed `MatchSettlementEscrow`)
     - `ONCHAIN_HOUSE_PRIVATE_KEY` (owner key that funds + settles)
     - `ONCHAIN_RAKE_BPS` / `ONCHAIN_RAKE_RECIPIENT` (optional overrides)
+
+Arc (Circle) settlement on Arc Testnet (optional):
+- `ARC_ONCHAIN_ENABLED=1`
+- `ARC_RPC_URL` (default: `https://rpc.testnet.arc.network`)
+- `ARC_USDC_ADDRESS` (default: `0x3600000000000000000000000000000000000000`)
+- `ARC_ESCROW_ADDRESS` (deployed `MatchSettlementEscrow` on Arc Testnet)
+- `ARC_HOUSE_PRIVATE_KEY` (house key with Arc USDC; Arc uses USDC as gas)
+- `ARC_ENTRY_AMOUNT_BASE_UNITS` (per-seat amount, base units, 18 decimals)
+- Faucet: `https://faucet.circle.com`
+- Verify tx: `https://testnet.arcscan.app`
 
 ENS (web, optional for now):
 - `NEXT_PUBLIC_ENS_REGISTRAR_ADDRESS` (deployed `AgentArenaSubnameRegistrar` address)

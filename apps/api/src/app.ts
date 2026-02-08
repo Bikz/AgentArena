@@ -37,6 +37,7 @@ import crypto from "node:crypto";
 import { YellowService } from "./yellow/yellow.js";
 import { OnchainSettlementService } from "./onchain/settlement.js";
 import { EIP712AuthTypes } from "@erc7824/nitrolite";
+import { getAddress } from "viem";
 import { SiweMessage } from "siwe";
 import {
   metricsContentType,
@@ -70,6 +71,14 @@ function normalizeOrigin(origin: string) {
   const trimmed = origin.trim();
   if (!trimmed) return "";
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
+}
+
+function safeAddress(raw: string): string | null {
+  try {
+    return getAddress(raw);
+  } catch {
+    return null;
+  }
 }
 
 type PerformanceMatch = {
@@ -346,6 +355,27 @@ export function buildApp() {
     rakeRecipient: process.env.ONCHAIN_RAKE_RECIPIENT,
     rakeBps: Number.isFinite(onchainRakeBps) ? onchainRakeBps : 0,
   });
+
+  // Arc (Circle) mirror settlement: USDC payouts on Arc Testnet for sponsor eligibility.
+  const arcRequested = process.env.ARC_ONCHAIN_ENABLED === "1";
+  const arcRpcUrl = process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.network";
+  const arcUsdcAddress =
+    process.env.ARC_USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000";
+  const arcEntryAmountBaseUnitsRaw = process.env.ARC_ENTRY_AMOUNT_BASE_UNITS ?? "0";
+  const arcEntryAmountBaseUnits =
+    arcEntryAmountBaseUnitsRaw && /^\d+$/.test(arcEntryAmountBaseUnitsRaw)
+      ? BigInt(arcEntryAmountBaseUnitsRaw)
+      : 0n;
+  const arcRakeBps = Number(process.env.ARC_RAKE_BPS ?? "0");
+  const arc = new OnchainSettlementService(app.log, {
+    enabled: arcRequested,
+    rpcUrl: arcRpcUrl,
+    tokenAddress: arcUsdcAddress,
+    contractAddress: process.env.ARC_ESCROW_ADDRESS,
+    housePrivateKey: process.env.ARC_HOUSE_PRIVATE_KEY as `0x${string}` | undefined,
+    rakeRecipient: process.env.ARC_RAKE_RECIPIENT,
+    rakeBps: Number.isFinite(arcRakeBps) ? arcRakeBps : 0,
+  });
   const demoAllowBots =
     process.env.DEMO_ALLOW_BOTS === "1" ||
     (process.env.NODE_ENV !== "production" && process.env.DEMO_ALLOW_BOTS !== "0");
@@ -414,6 +444,16 @@ export function buildApp() {
       });
     }
 
+    const arcOnchainRequested = process.env.ARC_ONCHAIN_ENABLED === "1";
+    if (arcOnchainRequested) {
+      if (!arc.isEnabled() || arcEntryAmountBaseUnits <= 0n) {
+        return reply.code(503).send({
+          ok: false as const,
+          error: "arc_not_configured" as const,
+        });
+      }
+    }
+
     if (paidMatches && !yellow.getHouseWallet()) {
       return reply.code(503).send({
         ok: false as const,
@@ -439,9 +479,18 @@ export function buildApp() {
       sessionPersistence: yellowSessionPersistenceEnabled,
     },
     demo: {
-      allowBots: demoAllowBots && !paidMatches,
+      allowBots: demoAllowBots,
     },
     onchain: onchain.getConfig(),
+    arc: {
+      ...arc.getConfig(),
+      requested: arcRequested,
+      rpcUrl: arcRequested ? arcRpcUrl : null,
+      usdcAddress: arcRequested ? safeAddress(arcUsdcAddress) : null,
+      entryAmountBaseUnits: arcRequested ? arcEntryAmountBaseUnits.toString() : null,
+      explorerBaseUrl: arcRequested ? "https://testnet.arcscan.app" : null,
+      chainId: arcRequested ? 5042002 : null,
+    },
   }));
   app.get("/config", async () => ({
     paidMatches,
@@ -459,6 +508,15 @@ export function buildApp() {
       contract: onchain.getConfig().contractAddress,
       rakeBps: onchain.getConfig().rakeBps,
     },
+    arc: {
+      enabled: arc.isEnabled(),
+      token: arc.getConfig().tokenAddress,
+      contract: arc.getConfig().contractAddress,
+      rakeBps: arc.getConfig().rakeBps,
+      entryAmountBaseUnits: arcRequested ? arcEntryAmountBaseUnits.toString() : null,
+      chainId: arcRequested ? 5042002 : null,
+      explorerBaseUrl: arcRequested ? "https://testnet.arcscan.app" : null,
+    },
   }));
 
   const DemoFillQuery = z.object({
@@ -469,8 +527,6 @@ export function buildApp() {
     { schema: { querystring: DemoFillQuery } },
     async (req, reply) => {
       if (!demoAllowBots) return reply.code(403).send({ error: "demo_disabled" as const });
-      if (paidMatches)
-        return reply.code(400).send({ error: "paid_matches_enabled" as const });
 
       const openSeats = Math.max(0, 5 - engine.getQueueSize());
       const desired = req.query.count ?? openSeats;
@@ -1046,6 +1102,34 @@ export function buildApp() {
           }
         }
       }
+
+      if (paidMatches && arc.isEnabled()) {
+        const seatsWithOwners = (m.seats as any[]).filter((s) => s.ownerAddress);
+        if (seatsWithOwners.length > 0 && arcEntryAmountBaseUnits > 0n) {
+          const pot = arcEntryAmountBaseUnits * BigInt(seatsWithOwners.length);
+          try {
+            const tx = await arc.fundMatch(m.config.matchId, pot);
+            if (pool && tx) {
+              await insertMatchPayment(pool, {
+                matchId: m.config.matchId,
+                kind: "onchain_fund",
+                asset: "usdc",
+                amount: pot.toString(),
+                fromWallet: arc.getConfig().houseAddress,
+                toWallet: arc.getConfig().contractAddress,
+                clientId: null,
+                tx,
+              });
+            }
+            app.log.info(
+              { matchId: m.config.matchId, pot: pot.toString() },
+              "arc match pot funded",
+            );
+          } catch (err) {
+            app.log.error({ err, matchId: m.config.matchId }, "arc pot funding failed");
+          }
+        }
+      }
     },
     onTick: async (m: any) => {
       if (pool) {
@@ -1153,21 +1237,53 @@ export function buildApp() {
       const seatsWithOwners = (m.seats as any[]).filter((s) => s.ownerAddress);
       if (seatsWithOwners.length === 0) return;
 
-      const winner = seatsWithOwners.reduce((best, cur) =>
+      const topSeat = (m.seats as any[]).reduce((best, cur) =>
         cur.credits > best.credits ? cur : best,
       );
+      // Always pay to a real wallet if there is one; bots can fill seats for demo speed.
+      const payoutSeat = topSeat.ownerAddress
+        ? topSeat
+        : seatsWithOwners.reduce((best, cur) => (cur.credits > best.credits ? cur : best));
+      const payoutWallet = payoutSeat.ownerAddress as string | undefined;
 
       const pot = entryAmount * BigInt(seatsWithOwners.length);
       const payout = (pot * payoutBps) / 10_000n;
       if (payout <= 0n) return;
 
-      if (onchain.isEnabled()) {
+      let arcTxHash: string | undefined;
+      if (arc.isEnabled() && arcEntryAmountBaseUnits > 0n && payoutWallet) {
         try {
-          const tx = await onchain.settleMatch(
-            m.config.matchId,
-            winner.ownerAddress as any,
-            onchainRakeBps,
+          const arcPot = arcEntryAmountBaseUnits * BigInt(seatsWithOwners.length);
+          const tx = await arc.settleMatch(m.config.matchId, payoutWallet as any, arcRakeBps);
+          arcTxHash = (tx as any)?.hash;
+          if (pool && tx) {
+            await insertMatchPayment(pool, {
+              matchId: m.config.matchId,
+              kind: "onchain_settlement",
+              asset: "usdc",
+              amount: arcPot.toString(),
+              fromWallet: arc.getConfig().contractAddress,
+              toWallet: payoutWallet ?? null,
+              clientId: payoutSeat.clientId ?? null,
+              tx,
+            });
+          }
+          app.log.info(
+            { matchId: m.config.matchId, winner: payoutWallet, asset: "usdc" },
+            "arc settlement sent",
           );
+        } catch (err) {
+          app.log.error(
+            { err, matchId: m.config.matchId, winner: payoutWallet },
+            "arc settlement failed",
+          );
+        }
+      }
+
+      // Legacy on-chain settlement is optional; never skip Yellow payout for it.
+      if (onchain.isEnabled() && payoutWallet) {
+        try {
+          const tx = await onchain.settleMatch(m.config.matchId, payoutWallet as any, onchainRakeBps);
           if (pool && tx) {
             await insertMatchPayment(pool, {
               matchId: m.config.matchId,
@@ -1175,31 +1291,26 @@ export function buildApp() {
               asset: onchainTokenSymbol,
               amount: pot.toString(),
               fromWallet: onchain.getConfig().contractAddress,
-              toWallet: winner.ownerAddress ?? null,
-              clientId: winner.clientId ?? null,
+              toWallet: payoutWallet ?? null,
+              clientId: payoutSeat.clientId ?? null,
               tx,
             });
           }
           app.log.info(
-            {
-              matchId: m.config.matchId,
-              winner: winner.ownerAddress,
-              payout: payout.toString(),
-              asset: onchainTokenSymbol,
-            },
+            { matchId: m.config.matchId, winner: payoutWallet, asset: onchainTokenSymbol },
             "onchain settlement sent",
           );
         } catch (err) {
           app.log.error(
-            { err, matchId: m.config.matchId, winner: winner.ownerAddress },
+            { err, matchId: m.config.matchId, winner: payoutWallet },
             "onchain settlement failed",
           );
         }
-        return;
       }
 
       try {
-        const tx = await yellow.houseTransfer(winner.ownerAddress as any, [
+        if (!payoutWallet) return;
+        const tx = await yellow.houseTransfer(payoutWallet as any, [
           { asset: entryAsset, amount: payout.toString() },
         ]);
         if (pool) {
@@ -1209,25 +1320,47 @@ export function buildApp() {
             asset: entryAsset,
             amount: payout.toString(),
             fromWallet: yellow.getHouseWallet(),
-            toWallet: winner.ownerAddress ?? null,
-            clientId: winner.clientId ?? null,
+            toWallet: payoutWallet ?? null,
+            clientId: payoutSeat.clientId ?? null,
             tx,
           });
         }
         app.log.info(
           {
             matchId: m.config.matchId,
-            winner: winner.ownerAddress,
+            winner: payoutWallet,
             payout: payout.toString(),
             asset: entryAsset,
           },
           "yellow payout sent",
         );
+
+        broadcastToAll({
+          type: "match_finished",
+          v: 1,
+          matchId: m.config.matchId,
+          winnerSeatId: String(topSeat.seatId),
+          payoutSeatId: String(payoutSeat.seatId),
+          ...(payoutWallet ? { payoutWallet } : null),
+          yellowPaid: true,
+          ...(arcTxHash ? { arcTxHash } : null),
+        });
       } catch (err) {
         app.log.error(
-          { err, matchId: m.config.matchId, winner: winner.ownerAddress },
+          { err, matchId: m.config.matchId, winner: payoutWallet },
           "yellow payout failed",
         );
+
+        broadcastToAll({
+          type: "match_finished",
+          v: 1,
+          matchId: m.config.matchId,
+          winnerSeatId: String(topSeat.seatId),
+          payoutSeatId: String(payoutSeat.seatId),
+          ...(payoutWallet ? { payoutWallet } : null),
+          yellowPaid: false,
+          ...(arcTxHash ? { arcTxHash } : null),
+        });
       }
     },
   };
