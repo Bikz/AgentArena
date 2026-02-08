@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";
 import { useAuth } from "@/hooks/useAuth";
+import { useToasts } from "@/components/toast-provider";
+import { normalizeError } from "@/lib/errors";
+import { fetchJson } from "@/lib/http";
 
 type Balance = { asset: string; amount: string };
 
@@ -14,6 +17,7 @@ export function YellowCard() {
   const { address, isConnected } = useAccount();
   const auth = useAuth();
   const { signTypedDataAsync } = useSignTypedData();
+  const { pushToast } = useToasts();
 
   const [state, setState] = useState<"idle" | "loading" | "enabling" | "error">(
     "idle",
@@ -31,29 +35,34 @@ export function YellowCard() {
     setState("loading");
     setError(null);
     try {
-      const res = await fetch(`${apiBase()}/yellow/me`, {
+      const { data: json } = await fetchJson<{ ok: true; balances: Balance[] }>(`${apiBase()}/yellow/me`, {
         method: "GET",
         credentials: "include",
         cache: "no-store",
       });
-      if (!res.ok) {
-        setBalances(null);
-        setState("idle");
-        return;
-      }
-      const json = (await res.json()) as { ok: true; balances: Balance[] };
       setBalances(json.balances ?? []);
       setLastUpdated(Date.now());
       setState("idle");
     } catch (err) {
       setBalances(null);
       setState("error");
-      setError(err instanceof Error ? err.message : "Unknown error");
+      const n = normalizeError(err, { feature: "yellow_me" });
+      setError(n.message);
+      pushToast({
+        title: n.title,
+        message: n.message,
+        details: n.details,
+        variant: n.variant,
+        dedupeKey: `yellow:me:${n.title}:${n.message}`,
+        dedupeWindowMs: 30_000,
+      });
     }
-  }, [auth.isSignedIn]);
+  }, [auth.isSignedIn, pushToast]);
 
   useEffect(() => {
-    void refresh();
+    // Defer to avoid synchronous setState inside effect body (eslint react-hooks/set-state-in-effect).
+    const t = setTimeout(() => void refresh(), 0);
+    return () => clearTimeout(t);
   }, [refresh]);
 
   const ytestUsd = useMemo(() => {
@@ -110,16 +119,7 @@ export function YellowCard() {
                 setState("enabling");
                 setError(null);
                 try {
-                  const startRes = await fetch(`${apiBase()}/yellow/auth/start`, {
-                    method: "POST",
-                    credentials: "include",
-                  });
-                  if (!startRes.ok) {
-                    const text = await startRes.text();
-                    throw new Error(text || "Failed to start Yellow auth.");
-                  }
-
-                  const startJson = (await startRes.json()) as {
+                  const { data: startJson } = await fetchJson<{
                     typedData: {
                       domain: { name: string };
                       types: any;
@@ -133,7 +133,10 @@ export function YellowCard() {
                         challenge: string;
                       };
                     };
-                  };
+                  }>(`${apiBase()}/yellow/auth/start`, {
+                    method: "POST",
+                    credentials: "include",
+                  });
 
                   const typed = startJson.typedData;
                   const signature = await signTypedDataAsync({
@@ -146,23 +149,28 @@ export function YellowCard() {
                     } as any,
                   });
 
-                  const verifyRes = await fetch(`${apiBase()}/yellow/auth/verify`, {
+                  await fetchJson<{ ok: true }>(`${apiBase()}/yellow/auth/verify`, {
                     method: "POST",
                     credentials: "include",
                     headers: { "content-type": "application/json" },
                     body: JSON.stringify({ signature }),
                   });
-                  if (!verifyRes.ok) {
-                    const text = await verifyRes.text();
-                    throw new Error(text || "Failed to verify Yellow auth.");
-                  }
 
                   await refresh();
                   setState("idle");
                 } catch (err) {
                   setBalances(null);
                   setState("error");
-                  setError(err instanceof Error ? err.message : "Unknown error");
+                  const n = normalizeError(err, { feature: "yellow_auth" });
+                  setError(n.message);
+                  pushToast({
+                    title: n.title,
+                    message: n.message,
+                    details: n.details,
+                    variant: n.variant,
+                    dedupeKey: `yellow:auth:${n.title}:${n.message}`,
+                    dedupeWindowMs: 15_000,
+                  });
                 }
               }}
               className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
@@ -186,20 +194,25 @@ export function YellowCard() {
                 setState("loading");
                 setError(null);
                 try {
-                  const res = await fetch(`${apiBase()}/yellow/faucet`, {
+                  await fetchJson<{ ok: true }>(`${apiBase()}/yellow/faucet`, {
                     method: "POST",
                     credentials: "include",
                   });
-                  if (!res.ok) {
-                    const text = await res.text();
-                    throw new Error(text || "Faucet request failed.");
-                  }
                   await new Promise((r) => setTimeout(r, 1200));
                   await refresh();
                   setState("idle");
                 } catch (err) {
                   setState("error");
-                  setError(err instanceof Error ? err.message : "Unknown error");
+                  const n = normalizeError(err, { feature: "yellow_faucet" });
+                  setError(n.message);
+                  pushToast({
+                    title: n.title,
+                    message: n.message,
+                    details: n.details,
+                    variant: n.variant,
+                    dedupeKey: `yellow:faucet:${n.title}:${n.message}`,
+                    dedupeWindowMs: 15_000,
+                  });
                 }
               }}
               className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted/40 disabled:opacity-50"
@@ -209,7 +222,7 @@ export function YellowCard() {
 
             {lastUpdated ? (
               <div className="text-sm text-muted-foreground">
-                Updated {Math.round((Date.now() - lastUpdated) / 1000)}s ago
+                Updated at {new Date(lastUpdated).toLocaleTimeString()}
               </div>
             ) : null}
           </div>

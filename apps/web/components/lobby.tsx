@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useWsEvents } from "@/hooks/useWsEvents";
 import { useAuth } from "@/hooks/useAuth";
+import { useToasts } from "@/components/toast-provider";
+import { normalizeError } from "@/lib/errors";
+import { fetchJson } from "@/lib/http";
 
 type Strategy = "hold" | "random" | "trend" | "mean_revert";
 type QueueState = "idle" | "queued" | "seated";
@@ -17,6 +20,7 @@ type Agent = {
 };
 
 export function Lobby() {
+  const { pushToast } = useToasts();
   const [agents, setAgents] = useState<Agent[] | null>(null);
   const [agentsState, setAgentsState] = useState<
     "loading" | "ready" | "error"
@@ -79,9 +83,7 @@ export function Lobby() {
       try {
         const base =
           process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
-        const res = await fetch(`${base}/config`, { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as {
+        const { data: json } = await fetchJson<{
           paidMatches: boolean;
           entry: { asset: string; amount: string };
           tickFee?: { asset: string; amount: string };
@@ -92,7 +94,7 @@ export function Lobby() {
             contract: string | null;
             rakeBps: number | null;
           };
-        };
+        }>(`${base}/config`, { cache: "no-store" }, { timeoutMs: 10_000 });
         if (cancelled) return;
         setPaidMatches(Boolean(json.paidMatches));
         setEntry(json.entry ?? null);
@@ -115,9 +117,11 @@ export function Lobby() {
       try {
         const base =
           process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
-        const res = await fetch(`${base}/status`, { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as any;
+        const { data: json } = await fetchJson<any>(
+          `${base}/status`,
+          { cache: "no-store" },
+          { timeoutMs: 10_000 },
+        );
         if (cancelled) return;
         setStatus(json ?? null);
       } catch {
@@ -140,13 +144,13 @@ export function Lobby() {
       try {
         const base =
           process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
-        const res = await fetch(`${base}/yellow/me`, {
+        await fetchJson(`${base}/yellow/me`, {
           method: "GET",
           credentials: "include",
           cache: "no-store",
         });
         if (cancelled) return;
-        setYellowReady(res.ok);
+        setYellowReady(true);
       } catch {
         if (cancelled) return;
         setYellowReady(false);
@@ -165,13 +169,11 @@ export function Lobby() {
       try {
         const base =
           process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
-        const res = await fetch(`${base}/agents`, { cache: "no-store" });
-        if (!res.ok) {
-          setAgents(null);
-          setAgentsState("error");
-          return;
-        }
-        const json = (await res.json()) as { agents: any[] };
+        const { data: json } = await fetchJson<{ agents: any[] }>(
+          `${base}/agents`,
+          { cache: "no-store" },
+          { timeoutMs: 15_000 },
+        );
         const list: Agent[] = (json.agents ?? []).map((a) => ({
           id: String(a.id),
           name: String(a.name),
@@ -183,10 +185,19 @@ export function Lobby() {
         setAgents(list);
         setAgentsState("ready");
         if (!selectedAgentId && list.length > 0) setSelectedAgentId(list[0]!.id);
-      } catch {
+      } catch (err) {
         if (cancelled) return;
         setAgents(null);
         setAgentsState("error");
+        const n = normalizeError(err, { feature: "agents_list" });
+        pushToast({
+          title: n.title,
+          message: "Couldn’t load agents. Refresh and try again.",
+          details: n.details,
+          variant: "warning",
+          dedupeKey: "agents:list",
+          dedupeWindowMs: 30_000,
+        });
       }
     };
     void run();
@@ -509,18 +520,23 @@ export function Lobby() {
                   try {
                     const base =
                       process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
-                    const res = await fetch(`${base}/demo/fill`, {
+                    await fetchJson<{ ok: true }>(`${base}/demo/fill`, {
                       method: "POST",
                       cache: "no-store",
                     });
-                    if (!res.ok) {
-                      const text = await res.text();
-                      throw new Error(text || "Failed to fill demo seats.");
-                    }
                     setDemoState("idle");
                   } catch (err) {
+                    const n = normalizeError(err, { feature: "demo_fill" });
                     setDemoState("error");
-                    setDemoError(err instanceof Error ? err.message : "Unknown error");
+                    setDemoError(n.message);
+                    pushToast({
+                      title: n.title,
+                      message: n.message,
+                      details: n.details,
+                      variant: n.variant,
+                      dedupeKey: `demo:fill:${n.title}:${n.message}`,
+                      dedupeWindowMs: 15_000,
+                    });
                   }
                 }}
                 className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted/40 disabled:opacity-50"

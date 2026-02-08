@@ -2,6 +2,9 @@
 
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { sepolia } from "viem/chains";
+import { useEffect, useRef } from "react";
+import { useToasts } from "@/components/toast-provider";
+import { normalizeError } from "@/lib/errors";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -17,6 +20,8 @@ export function ConnectWalletButton() {
   const { connect, connectors, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const { pushToast } = useToasts();
+  const lastErrorRef = useRef<string | null>(null);
 
   // wagmi's injected connector can exist even when no provider is installed.
   // Prefer WalletConnect in that case, otherwise "connect" looks like a no-op.
@@ -29,6 +34,22 @@ export function ConnectWalletButton() {
     : undefined;
   const walletConnect = available.find((connector) => connector.id === "walletConnect");
   const primary = injected ?? walletConnect ?? available[0];
+
+  useEffect(() => {
+    const msg = error?.message ?? null;
+    if (!msg) return;
+    if (lastErrorRef.current === msg) return;
+    lastErrorRef.current = msg;
+    const n = normalizeError(error, { feature: "wallet_connect" });
+    pushToast({
+      title: n.title,
+      message: n.message,
+      details: n.details,
+      variant: n.variant,
+      dedupeKey: `wallet-connect:${msg}`,
+      dedupeWindowMs: 30_000,
+    });
+  }, [error, pushToast]);
 
   if (!isConnected) {
     return (
@@ -53,11 +74,6 @@ export function ConnectWalletButton() {
         ) : null}
         {!primary ? (
           <span className="text-xs text-muted-foreground">No wallet available</span>
-        ) : null}
-        {error ? (
-          <span className="text-xs text-destructive">
-            {error.message}
-          </span>
         ) : null}
       </div>
     );

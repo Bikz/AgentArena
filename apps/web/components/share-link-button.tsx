@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useToasts } from "@/components/toast-provider";
+import { normalizeError } from "@/lib/errors";
 
 type State = "idle" | "copying" | "copied" | "error";
 
@@ -12,7 +14,7 @@ export function ShareLinkButton({
   label?: string;
 }) {
   const [state, setState] = useState<State>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const { pushToast } = useToasts();
 
   useEffect(() => {
     if (state !== "copied") return;
@@ -22,17 +24,31 @@ export function ShareLinkButton({
 
   const handleCopy = useCallback(async () => {
     setState("copying");
-    setError(null);
     try {
       const url = new URL(path, window.location.origin).toString();
       if (!navigator.clipboard) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(url);
       setState("copied");
+      pushToast({
+        title: "Link copied",
+        message: "Copied to clipboard.",
+        variant: "success",
+        dedupeKey: `clipboard:copied:${path}`,
+        dedupeWindowMs: 2000,
+      });
     } catch (err) {
       setState("error");
-      setError(err instanceof Error ? err.message : "Failed to copy link.");
+      const n = normalizeError(err, { feature: "copy_link" });
+      pushToast({
+        title: n.title,
+        message: n.message,
+        details: n.details,
+        variant: n.variant,
+        dedupeKey: `clipboard:error:${n.title}:${n.message}`,
+        dedupeWindowMs: 10_000,
+      });
     }
-  }, [path]);
+  }, [path, pushToast]);
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -44,9 +60,6 @@ export function ShareLinkButton({
       >
         {state === "copied" ? "Copied" : state === "copying" ? "Copying…" : label}
       </button>
-      {state === "error" && error ? (
-        <div className="text-xs text-destructive-foreground/80">{error}</div>
-      ) : null}
     </div>
   );
 }

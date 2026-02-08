@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiBaseHttp } from "@/lib/api";
 import { ShareLinkButton } from "@/components/share-link-button";
+import { useToasts } from "@/components/toast-provider";
+import { normalizeError } from "@/lib/errors";
+import { fetchJson, HttpError } from "@/lib/http";
 
 type PerfSummary = {
   matches: number;
@@ -38,14 +41,21 @@ type PerfResponse = {
 };
 
 async function fetchPlayerPerf(address: string): Promise<PerfResponse | null> {
-  const res = await fetch(`${apiBaseHttp()}/players/${address}/perf`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const { data } = await fetchJson<PerfResponse>(
+      `${apiBaseHttp()}/players/${address}/perf`,
+      { cache: "no-store" },
+      { timeoutMs: 15_000 },
+    );
+    return data;
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 export function PlayerProfile({ address }: { address: string }) {
+  const { pushToast } = useToasts();
   const [perf, setPerf] = useState<PerfResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
@@ -63,17 +73,26 @@ export function PlayerProfile({ address }: { address: string }) {
         }
         setPerf(data);
         setState("ready");
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        const n = normalizeError(err, { feature: "player_perf" });
         setPerf(null);
         setState("error");
+        pushToast({
+          title: n.title,
+          message: n.message,
+          details: n.details,
+          variant: n.variant,
+          dedupeKey: `player:perf:${n.title}:${n.message}`,
+          dedupeWindowMs: 30_000,
+        });
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [address, pushToast]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-10">

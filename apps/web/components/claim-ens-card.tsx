@@ -6,6 +6,9 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagm
 import { concatHex, keccak256, stringToHex } from "viem";
 import { agentArenaSubnameRegistrarAbi, getParentNamehash, getRegistrarAddress } from "@/lib/ens-registrar";
 import { useAuth } from "@/hooks/useAuth";
+import { useToasts } from "@/components/toast-provider";
+import { normalizeError } from "@/lib/errors";
+import { fetchJson } from "@/lib/http";
 
 function sanitizeLabel(input: string) {
   return input
@@ -37,6 +40,7 @@ export function ClaimEnsCard(props: {
   const router = useRouter();
   const { address, isConnected, chainId } = useAccount();
   const auth = useAuth();
+  const { pushToast } = useToasts();
   const registrar = getRegistrarAddress();
   const parentNamehash = getParentNamehash();
 
@@ -96,7 +100,7 @@ export function ClaimEnsCard(props: {
       setError(null);
       try {
         const base = process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
-        const res = await fetch(`${base}/agents/${props.agent.id}/ens`, {
+        await fetchJson<{ ok: true }>(`${base}/agents/${props.agent.id}/ens`, {
           method: "POST",
           credentials: "include",
           headers: { "content-type": "application/json" },
@@ -106,25 +110,30 @@ export function ClaimEnsCard(props: {
             txHash: pending.txHash,
           }),
         });
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || "Failed to persist ENS claim.");
-        }
         if (cancelled) return;
         setPending(null);
         setState("idle");
         router.refresh();
       } catch (err) {
         if (cancelled) return;
+        const n = normalizeError(err, { feature: "ens_persist" });
         setState("error");
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(n.message);
+        pushToast({
+          title: n.title,
+          message: n.message,
+          details: n.details,
+          variant: n.variant,
+          dedupeKey: `ens:persist:${n.title}:${n.message}`,
+          dedupeWindowMs: 15_000,
+        });
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [pending, props.agent.id, receipt.isSuccess, router]);
+  }, [pending, props.agent.id, receipt.isSuccess, router, pushToast]);
 
   return (
     <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -222,8 +231,17 @@ export function ClaimEnsCard(props: {
 
               setPending({ txHash: tx, ensName, node });
             } catch (err) {
+              const n = normalizeError(err, { feature: "ens_register" });
               setState("error");
-              setError(err instanceof Error ? err.message : "Unknown error");
+              setError(n.message);
+              pushToast({
+                title: n.title,
+                message: n.message,
+                details: n.details,
+                variant: n.variant,
+                dedupeKey: `ens:register:${n.title}:${n.message}`,
+                dedupeWindowMs: 15_000,
+              });
             } finally {
               // state may be set to saving by effect if receipt succeeds
               setState((s) => (s === "saving" ? s : "idle"));

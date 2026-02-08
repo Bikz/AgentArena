@@ -4,12 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useToasts } from "@/components/toast-provider";
+import { normalizeError } from "@/lib/errors";
+import { fetchJson } from "@/lib/http";
 
 type Strategy = "hold" | "random" | "trend" | "mean_revert";
 
 export function NewAgentForm() {
   const router = useRouter();
   const auth = useAuth();
+  const { pushToast } = useToasts();
   const [name, setName] = useState("MyAgent");
   const [model, setModel] = useState("openai/gpt-4o-mini");
   const [strategy, setStrategy] = useState<Strategy>("trend");
@@ -58,7 +62,7 @@ export function NewAgentForm() {
           try {
             const base =
               process.env.NEXT_PUBLIC_API_HTTP_URL ?? "http://localhost:3001";
-            const res = await fetch(`${base}/agents`, {
+            await fetchJson<{ ok: true }>(`${base}/agents`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               credentials: "include",
@@ -70,16 +74,19 @@ export function NewAgentForm() {
               }),
             });
 
-            if (!res.ok) {
-              if (res.status === 401) throw new Error("Sign in to create agents.");
-              const text = await res.text();
-              throw new Error(text || "Failed to create agent.");
-            }
-
             router.push("/");
           } catch (err) {
+            const n = normalizeError(err, { feature: "create_agent" });
             setState("error");
-            setError(err instanceof Error ? err.message : "Unknown error");
+            setError(n.message);
+            pushToast({
+              title: n.title,
+              message: n.message,
+              details: n.details,
+              variant: n.variant,
+              dedupeKey: `create-agent:${n.title}:${n.message}`,
+              dedupeWindowMs: 15_000,
+            });
           } finally {
             setState("idle");
           }

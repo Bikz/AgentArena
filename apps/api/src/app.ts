@@ -1645,7 +1645,22 @@ export function buildApp() {
 
   app.setErrorHandler((err, req, reply) => {
     req.log.error({ err }, "request failed");
-    reply.status(500).send({ error: "internal" as const });
+    // Expose request id for correlating client errors with Render logs.
+    reply.header("x-request-id", req.id);
+    const isProd = process.env.NODE_ENV === "production";
+    reply.status(500).send({
+      error: {
+        code: "internal" as const,
+        requestId: req.id as string,
+        ...(isProd ? null : { message: err instanceof Error ? err.message : String(err) }),
+      },
+    });
+  });
+
+  // Always include request id on responses for debugging.
+  app.addHook("onSend", async (req, reply, payload) => {
+    reply.header("x-request-id", req.id);
+    return payload;
   });
 
   app.addHook("onClose", async () => {

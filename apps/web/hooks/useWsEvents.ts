@@ -7,6 +7,8 @@ import {
   type ServerEvent,
 } from "@agent-arena/shared";
 import { useEffect, useRef, useState } from "react";
+import { useToasts } from "@/components/toast-provider";
+import { normalizeError } from "@/lib/errors";
 
 type WsState = "connecting" | "connected" | "disconnected" | "error";
 
@@ -15,10 +17,16 @@ export function useWsEvents(options?: {
 }) {
   const [state, setState] = useState<WsState>("connecting");
   const [events, setEvents] = useState<ServerEvent[]>([]);
+  const [wsStatus, setWsStatus] = useState<{
+    attempt: number;
+    lastClose: { code: number; reason: string } | null;
+  }>({ attempt: 0, lastClose: null });
+  const { pushToast } = useToasts();
   const socketRef = useRef<WebSocket | null>(null);
   const outboundQueueRef = useRef<string[]>([]);
   const retryRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCloseRef = useRef<{ code: number; reason: string } | null>(null);
 
   useEffect(() => {
     let closed = false;
@@ -40,6 +48,8 @@ export function useWsEvents(options?: {
       socket.addEventListener("open", () => {
         retryRef.current = 0;
         setState("connected");
+        lastCloseRef.current = null;
+        setWsStatus({ attempt: 0, lastClose: null });
 
         // Resend initial messages (e.g. subscribe) on each successful connect.
         for (const msg of options?.onOpenSend ?? []) {
@@ -53,13 +63,39 @@ export function useWsEvents(options?: {
         for (const payload of queue) socket.send(payload);
       });
 
-      socket.addEventListener("close", () => {
+      socket.addEventListener("close", (ev) => {
         if (closed) return;
         setState("disconnected");
 
         const attempt = Math.min(6, retryRef.current + 1);
         retryRef.current = attempt;
         const delay = Math.min(5000, 250 * 2 ** (attempt - 1));
+
+        const code = typeof ev.code === "number" ? ev.code : 0;
+        const reason = typeof ev.reason === "string" ? ev.reason : "";
+        const last = lastCloseRef.current;
+        lastCloseRef.current = { code, reason };
+        setWsStatus({ attempt, lastClose: { code, reason } });
+
+        // Only toast after a few failed attempts, and dedupe.
+        if (attempt >= 3) {
+          const n = normalizeError(
+            new Error("WebSocket disconnected"),
+            {
+              feature: "ws",
+              ws: { attempt, closeCode: code, closeReason: reason },
+            },
+          );
+          pushToast({
+            title: n.title,
+            message: n.message,
+            details: n.details,
+            variant: n.variant,
+            dedupeKey: `ws:${code}:${reason}:${attempt}:${last?.code ?? ""}:${last?.reason ?? ""}`,
+            dedupeWindowMs: 30_000,
+          });
+        }
+
         reconnectTimerRef.current = setTimeout(connect, delay);
       });
 
@@ -90,7 +126,7 @@ export function useWsEvents(options?: {
       if (socket) socket.close();
       socketRef.current = null;
     };
-  }, [options?.onOpenSend]);
+  }, [options?.onOpenSend, pushToast]);
 
   const send = (msg: ClientEvent) => {
     const socket = socketRef.current;
@@ -106,5 +142,5 @@ export function useWsEvents(options?: {
     return true;
   };
 
-  return { state, events, send };
+  return { state, events, send, wsStatus };
 }

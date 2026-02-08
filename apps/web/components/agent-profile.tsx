@@ -6,6 +6,9 @@ import { apiBaseHttp } from "@/lib/api";
 import { ClaimEnsCard } from "@/components/claim-ens-card";
 import { useAuth } from "@/hooks/useAuth";
 import { ShareLinkButton } from "@/components/share-link-button";
+import { useToasts } from "@/components/toast-provider";
+import { normalizeError } from "@/lib/errors";
+import { fetchJson, HttpError } from "@/lib/http";
 
 type PublicAgent = {
   id: string;
@@ -58,30 +61,50 @@ type PerfResponse = {
 };
 
 async function fetchPublicAgent(agentId: string): Promise<PublicAgent | null> {
-  const res = await fetch(`${apiBaseHttp()}/agents/${agentId}/public`, { cache: "no-store" });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { agent: PublicAgent };
-  return json.agent;
+  try {
+    const { data } = await fetchJson<{ agent: PublicAgent }>(
+      `${apiBaseHttp()}/agents/${agentId}/public`,
+      { cache: "no-store" },
+      { timeoutMs: 15_000 },
+    );
+    return data.agent;
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 async function fetchPrivateAgent(agentId: string): Promise<PrivateAgent | null> {
-  const res = await fetch(`${apiBaseHttp()}/agents/${agentId}`, {
-    credentials: "include",
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { agent: PrivateAgent };
-  return json.agent;
+  try {
+    const { data } = await fetchJson<{ agent: PrivateAgent }>(
+      `${apiBaseHttp()}/agents/${agentId}`,
+      { credentials: "include", cache: "no-store" },
+      { timeoutMs: 15_000 },
+    );
+    return data.agent;
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 async function fetchAgentPerf(agentId: string): Promise<PerfResponse | null> {
-  const res = await fetch(`${apiBaseHttp()}/agents/${agentId}/perf`, { cache: "no-store" });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const { data } = await fetchJson<PerfResponse>(
+      `${apiBaseHttp()}/agents/${agentId}/perf`,
+      { cache: "no-store" },
+      { timeoutMs: 15_000 },
+    );
+    return data;
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 export function AgentProfile({ agentId }: { agentId: string }) {
   const auth = useAuth();
+  const { pushToast } = useToasts();
 
   const [publicAgent, setPublicAgent] = useState<PublicAgent | null>(null);
   const [publicState, setPublicState] = useState<"loading" | "ready" | "error">("loading");
@@ -112,15 +135,24 @@ export function AgentProfile({ agentId }: { agentId: string }) {
         setPublicState("ready");
       } catch (err) {
         if (cancelled) return;
+        const n = normalizeError(err, { feature: "agent_public" });
         setPublicState("error");
-        setPublicError(err instanceof Error ? err.message : "Unknown error");
+        setPublicError(n.message);
+        pushToast({
+          title: n.title,
+          message: n.message,
+          details: n.details,
+          variant: n.variant,
+          dedupeKey: `agent:public:${n.title}:${n.message}`,
+          dedupeWindowMs: 30_000,
+        });
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [agentId]);
+  }, [agentId, pushToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,17 +168,26 @@ export function AgentProfile({ agentId }: { agentId: string }) {
         }
         setPerf(data);
         setPerfState("ready");
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        const n = normalizeError(err, { feature: "agent_perf" });
         setPerf(null);
         setPerfState("error");
+        pushToast({
+          title: n.title,
+          message: n.message,
+          details: n.details,
+          variant: n.variant,
+          dedupeKey: `agent:perf:${n.title}:${n.message}`,
+          dedupeWindowMs: 30_000,
+        });
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [agentId]);
+  }, [agentId, pushToast]);
 
   const isOwner =
     auth.isSignedIn &&
@@ -178,15 +219,24 @@ export function AgentProfile({ agentId }: { agentId: string }) {
         setPrivateState("ready");
       } catch (err) {
         if (cancelled) return;
+        const n = normalizeError(err, { feature: "agent_private" });
         setPrivateState("error");
-        setPrivateError(err instanceof Error ? err.message : "Unknown error");
+        setPrivateError(n.message);
+        pushToast({
+          title: n.title,
+          message: n.message,
+          details: n.details,
+          variant: n.variant,
+          dedupeKey: `agent:private:${n.title}:${n.message}`,
+          dedupeWindowMs: 30_000,
+        });
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [agentId, isOwner]);
+  }, [agentId, isOwner, pushToast]);
 
   if (publicState === "loading") {
     return (
