@@ -28,7 +28,7 @@ contract MatchSettlementEscrow is Ownable {
     );
     event MatchCancelled(bytes32 indexed matchId, address recipient, uint256 amount);
 
-    constructor(address tokenAddress) {
+    constructor(address tokenAddress) Ownable(msg.sender) {
         require(tokenAddress != address(0), "token");
         token = IERC20(tokenAddress);
     }

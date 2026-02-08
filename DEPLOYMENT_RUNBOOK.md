@@ -22,6 +22,26 @@ The web bundle is configured to call:
 
 This must be a real hostname mapped to the Render service.
 
+## Current Sponsor State (as of 2026-02-08)
+
+Enabled in production:
+- Demo bots: `DEMO_ALLOW_BOTS=1`
+- Yellow paid matches: `YELLOW_PAID_MATCHES=1`
+- Arc mirror payouts: `ARC_ONCHAIN_ENABLED=1`
+
+Contracts deployed:
+- Arc Testnet `MatchSettlementEscrow`:
+  - Address: `0x0d10743428106990aF57C04ce86eEF34A571C920`
+  - Deploy tx: `0x366077325fa098f5998c215ca8cc0f371bb58afa7e98799016d84b0fb0a9b454`
+  - Explorer: `https://testnet.arcscan.app`
+- Sepolia `AgentArenaSubnameRegistrar`:
+  - Address: `0x0d10743428106990aF57C04ce86eEF34A571C920`
+  - Deploy tx: `0x4ac1001ae17ab319178abad5496792e5293065cf2efaa4f307c52b50f9ec6493`
+  - Parent name: `agentarena-hackmoney-2026.eth`
+  - Parent namehash: `0xc38c56ba7335daf9d411d9aafb0b2a66926cc8118846259c826b2ada305e0dc8`
+  - Parent register tx: `0xa9353a2721baec69306d7ed859ad193dbe6df7657e2f79b02d83dd8d67b42f12`
+  - Parent unwrap tx (sets ENS registry owner to registrar): `0xba4523d11304ba4b027ccd482c4d071ab8703da0da46f3c557a291dd7d0efb37`
+
 ## Required Manual DNS (Cloudflare)
 
 Create a DNS record so the API hostname resolves:
