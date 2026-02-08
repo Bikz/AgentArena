@@ -10,6 +10,14 @@ const __dirname = path.dirname(__filename);
 async function main() {
   const pool = createPool();
   if (!pool) {
+    // In some demo/spectate-only deployments we intentionally run without Postgres.
+    // Allow skipping migrations in that mode so the API can still boot.
+    const requireDb = process.env.REQUIRE_DB !== "0";
+    const skip = process.env.SKIP_MIGRATIONS === "1" || !requireDb;
+    if (skip) {
+      console.warn("DATABASE_URL is not set; skipping migrations");
+      return;
+    }
     console.error("DATABASE_URL is not set");
     process.exit(1);
   }
