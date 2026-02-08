@@ -80,14 +80,21 @@ export function ArcCard() {
         const client = createPublicClient({
           transport: http(arc.rpcUrl),
         });
-        const raw = await client.readContract({
-          address: arc.usdc,
-          abi: erc20Abi,
-          functionName: "balanceOf",
-          args: [address as Address],
-        });
+        const [raw, decimals] = await Promise.all([
+          client.readContract({
+            address: arc.usdc,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [address as Address],
+          }),
+          client.readContract({
+            address: arc.usdc,
+            abi: erc20Abi,
+            functionName: "decimals",
+          }),
+        ]);
         if (cancelled) return;
-        setBalance(formatUnits(raw, 18));
+        setBalance(formatUnits(raw, decimals));
         setBalanceState("idle");
       } catch (err) {
         if (cancelled) return;
@@ -191,4 +198,3 @@ export function ArcCard() {
     </section>
   );
 }
-

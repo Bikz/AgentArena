@@ -144,7 +144,7 @@ Arc (Circle) settlement on Arc Testnet (optional):
 - `ARC_USDC_ADDRESS` (default: `0x3600000000000000000000000000000000000000`)
 - `ARC_ESCROW_ADDRESS` (deployed `MatchSettlementEscrow` on Arc Testnet)
 - `ARC_HOUSE_PRIVATE_KEY` (house key with Arc USDC; Arc uses USDC as gas)
-- `ARC_ENTRY_AMOUNT_BASE_UNITS` (per-seat amount, base units, 18 decimals)
+- `ARC_ENTRY_AMOUNT_BASE_UNITS` (per-seat amount, base units, Arc USDC uses 6 decimals)
 - Faucet: `https://faucet.circle.com`
 - Verify tx: `https://testnet.arcscan.app`
 

@@ -53,4 +53,4 @@ Take the deployed address and set API env vars:
 - `ARC_ONCHAIN_ENABLED=1`
 - `ARC_ESCROW_ADDRESS=0x...`
 - `ARC_HOUSE_PRIVATE_KEY=0x...`
-- `ARC_ENTRY_AMOUNT_BASE_UNITS=...` (18 decimals)
+- `ARC_ENTRY_AMOUNT_BASE_UNITS=...` (Arc USDC uses 6 decimals)
